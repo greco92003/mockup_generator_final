@@ -11,6 +11,7 @@ const { v4: uuidv4 } = require("uuid");
 const activeCampaign = require("./active-campaign-api");
 const supabaseStorage = require("./supabase-storage");
 const cloudinaryConfig = require("./cloudinary-config");
+const awsLambdaConfig = require("./aws-lambda-config");
 
 // Load environment variables
 dotenv.config();
@@ -327,6 +328,85 @@ async function saveMockupToPublic(mockupPath, email) {
     throw error;
   }
 }
+
+// API endpoint for mockup generation with AWS Lambda and ActiveCampaign integration
+app.post("/api/mockup/lambda", upload.single("logo"), async (req, res) => {
+  let logoUrl = null;
+
+  try {
+    console.log("Received mockup generation request (AWS Lambda)");
+    const { name, email, phone } = req.body;
+
+    console.log(`Request data: email=${email}, name=${name}`);
+
+    if (!req.file) {
+      console.log("Error: Logo file is missing");
+      return res.status(400).json({ error: "Logo file is required" });
+    }
+
+    if (!email) {
+      console.log("Error: Email is missing");
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    const mime = req.file.mimetype;
+    console.log(`File type: ${mime}, size: ${req.file.size} bytes`);
+
+    // Upload logo to Cloudinary (we still use Cloudinary for logo storage)
+    console.log("Uploading logo to Cloudinary...");
+    const uploadResult = await cloudinaryConfig.uploadToCloudinary(
+      req.file.buffer,
+      req.file.originalname,
+      "logos"
+    );
+
+    logoUrl = uploadResult.secure_url;
+    console.log(`Logo uploaded to Cloudinary: ${logoUrl}`);
+
+    // Generate mockup using AWS Lambda
+    console.log("Generating mockup with AWS Lambda...");
+    const mockupUrl = await awsLambdaConfig.generateMockupWithLambda(
+      logoUrl,
+      email,
+      name
+    );
+    console.log(`Mockup generated with AWS Lambda: ${mockupUrl}`);
+
+    // Process lead in ActiveCampaign
+    console.log("Processing lead in ActiveCampaign...");
+    try {
+      await activeCampaign.processLeadWithMockup(
+        { email, name, phone },
+        mockupUrl
+      );
+      console.log("Lead processed in ActiveCampaign successfully");
+    } catch (acError) {
+      console.error("Error processing lead in ActiveCampaign:", acError);
+      // Continue even if ActiveCampaign fails
+    }
+
+    // Return the result with WhatsApp redirect URL
+    const response = {
+      name,
+      email,
+      phone,
+      image: mockupUrl,
+      url: mockupUrl,
+      redirect_url: WHATSAPP_REDIRECT_URL,
+    };
+
+    console.log("Sending successful response");
+    res.json(response);
+  } catch (error) {
+    console.error("Error processing request with AWS Lambda:", error);
+    console.error("Stack trace:", error.stack);
+    res.status(500).json({
+      error: "Failed to generate mockup with AWS Lambda",
+      message: error.message,
+      stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
+    });
+  }
+});
 
 // API endpoint for mockup generation with Cloudinary and ActiveCampaign integration
 app.post("/api/mockup/cloudinary", upload.single("logo"), async (req, res) => {

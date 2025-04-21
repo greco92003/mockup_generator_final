@@ -1,288 +1,369 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Mockup Generator</title>
     <style>
-        :root {
-            --primary-color: #3498db;
-            --secondary-color: #2980b9;
-            --error-color: #e74c3c;
-            --text-color: #333;
-            --bg-color: #f5f5f5;
-            --card-bg: #fff;
-            --border-color: #ddd;
-        }
+      :root {
+        --primary-color: #3498db;
+        --secondary-color: #2980b9;
+        --error-color: #e74c3c;
+        --text-color: #333;
+        --bg-color: #f5f5f5;
+        --card-bg: #fff;
+        --border-color: #ddd;
+      }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            line-height: 1.6;
-            padding: 2rem;
-        }
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        line-height: 1.6;
+        padding: 2rem;
+      }
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
 
-        h1 {
-            text-align: center;
-            margin-bottom: 1rem;
-            color: var(--primary-color);
-        }
+      h1 {
+        text-align: center;
+        margin-bottom: 1rem;
+        color: var(--primary-color);
+      }
 
-        .description {
-            text-align: center;
-            margin-bottom: 2rem;
-            color: #666;
-        }
+      .description {
+        text-align: center;
+        margin-bottom: 2rem;
+        color: #666;
+      }
 
+      .content {
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+      }
+
+      @media (min-width: 768px) {
         .content {
-            display: flex;
-            flex-direction: column;
-            gap: 2rem;
+          flex-direction: row;
         }
+      }
 
-        @media (min-width: 768px) {
-            .content {
-                flex-direction: row;
-            }
-        }
+      .card {
+        background-color: var(--card-bg);
+        padding: 2rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        flex: 1;
+      }
 
-        .card {
-            background-color: var(--card-bg);
-            padding: 2rem;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            flex: 1;
-        }
+      .form-group {
+        margin-bottom: 1.5rem;
+      }
 
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
+      label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 600;
+      }
 
-        label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-weight: 600;
-        }
+      input {
+        width: 100%;
+        padding: 0.75rem;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        font-size: 1rem;
+      }
 
-        input {
-            width: 100%;
-            padding: 0.75rem;
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            font-size: 1rem;
-        }
+      button {
+        width: 100%;
+        padding: 0.75rem;
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+        border-radius: 4px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color 0.3s;
+      }
 
-        button {
-            width: 100%;
-            padding: 0.75rem;
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            border-radius: 4px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
+      button:hover {
+        background-color: var(--secondary-color);
+      }
 
-        button:hover {
-            background-color: var(--secondary-color);
-        }
+      button:disabled {
+        background-color: #95a5a6;
+        cursor: not-allowed;
+      }
 
-        button:disabled {
-            background-color: #95a5a6;
-            cursor: not-allowed;
-        }
+      .radio-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+      }
 
-        .error-message {
-            margin-top: 1rem;
-            padding: 0.75rem;
-            background-color: rgba(231, 76, 60, 0.1);
-            color: var(--error-color);
-            border-radius: 4px;
-            font-size: 0.9rem;
-        }
+      .radio-label {
+        display: flex;
+        align-items: center;
+        font-weight: normal;
+        cursor: pointer;
+      }
 
-        .preview {
-            text-align: center;
-        }
+      .radio-label input {
+        width: auto;
+        margin-right: 0.5rem;
+      }
 
-        .preview img {
-            max-width: 100%;
-            height: auto;
-            border-radius: 4px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            margin-bottom: 1.5rem;
-        }
+      .error-message {
+        margin-top: 1rem;
+        padding: 0.75rem;
+        background-color: rgba(231, 76, 60, 0.1);
+        color: var(--error-color);
+        border-radius: 4px;
+        font-size: 0.9rem;
+      }
 
-        .download-btn {
-            display: inline-block;
-            padding: 0.75rem 1.5rem;
-            background-color: var(--primary-color);
-            color: white;
-            text-decoration: none;
-            border-radius: 4px;
-            font-weight: 600;
-            transition: background-color 0.3s;
-        }
+      .preview {
+        text-align: center;
+      }
 
-        .download-btn:hover {
-            background-color: var(--secondary-color);
-        }
+      .preview img {
+        max-width: 100%;
+        height: auto;
+        border-radius: 4px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        margin-bottom: 1.5rem;
+      }
 
-        .loading {
-            text-align: center;
-            margin: 2rem 0;
-        }
+      .download-btn {
+        display: inline-block;
+        padding: 0.75rem 1.5rem;
+        background-color: var(--primary-color);
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+        font-weight: 600;
+        transition: background-color 0.3s;
+      }
 
-        .spinner {
-            border: 4px solid rgba(0, 0, 0, 0.1);
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            border-left-color: var(--primary-color);
-            animation: spin 1s linear infinite;
-            margin: 0 auto 1rem;
-        }
+      .download-btn:hover {
+        background-color: var(--secondary-color);
+      }
 
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+      .loading {
+        text-align: center;
+        margin: 2rem 0;
+      }
+
+      .spinner {
+        border: 4px solid rgba(0, 0, 0, 0.1);
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        border-left-color: var(--primary-color);
+        animation: spin 1s linear infinite;
+        margin: 0 auto 1rem;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
         }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div class="container">
-        <h1>Mockup Generator</h1>
-        <p class="description">Upload your logo (PDF, PNG, or JPG) and we'll generate a mockup for you</p>
+      <h1>Mockup Generator</h1>
+      <p class="description">
+        Upload your logo (PDF, PNG, or JPG) and we'll generate a mockup for you
+      </p>
 
-        <div class="content">
-            <div class="card">
-                <form id="mockupForm">
-                    <div class="form-group">
-                        <label for="name">Name</label>
-                        <input type="text" id="name" name="name" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="email">Email</label>
-                        <input type="email" id="email" name="email" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="phone">Phone</label>
-                        <input type="tel" id="phone" name="phone" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="logo">Logo (PDF, PNG, JPG)</label>
-                        <input type="file" id="logo" name="logo" accept=".pdf,.png,.jpg,.jpeg" required>
-                    </div>
-                    
-                    <button type="submit" id="submitBtn">Generate Mockup</button>
-                    <div id="error" class="error-message" style="display: none;"></div>
-                    
-                    <div id="loading" class="loading" style="display: none;">
-                        <div class="spinner"></div>
-                        <p>Generating your mockup...</p>
-                    </div>
-                </form>
+      <div class="content">
+        <div class="card">
+          <form id="mockupForm">
+            <div class="form-group">
+              <label for="name">Name</label>
+              <input type="text" id="name" name="name" required />
             </div>
 
-            <div id="preview" class="card preview" style="display: none;">
-                <h2>Your Mockup</h2>
-                <img id="previewImage" src="" alt="Generated mockup">
-                <a id="downloadBtn" href="#" download="mockup.png" class="download-btn">Download Mockup</a>
+            <div class="form-group">
+              <label for="email">Email</label>
+              <input type="email" id="email" name="email" required />
             </div>
+
+            <div class="form-group">
+              <label for="phone">Phone</label>
+              <input type="tel" id="phone" name="phone" required />
+            </div>
+
+            <div class="form-group">
+              <label for="logo">Logo (PDF, PNG, JPG)</label>
+              <input
+                type="file"
+                id="logo"
+                name="logo"
+                accept=".pdf,.png,.jpg,.jpeg"
+                required
+              />
+            </div>
+
+            <div class="form-group">
+              <label>Processing Method</label>
+              <div class="radio-group">
+                <label class="radio-label">
+                  <input
+                    type="radio"
+                    name="processingMethod"
+                    value="lambda"
+                    checked
+                  />
+                  AWS Lambda (Recommended)
+                </label>
+                <label class="radio-label">
+                  <input
+                    type="radio"
+                    name="processingMethod"
+                    value="cloudinary"
+                  />
+                  Cloudinary
+                </label>
+                <label class="radio-label">
+                  <input type="radio" name="processingMethod" value="local" />
+                  Local Processing
+                </label>
+              </div>
+            </div>
+
+            <button type="submit" id="submitBtn">Generate Mockup</button>
+            <div id="error" class="error-message" style="display: none"></div>
+
+            <div id="loading" class="loading" style="display: none">
+              <div class="spinner"></div>
+              <p>Generating your mockup...</p>
+            </div>
+          </form>
         </div>
+
+        <div id="preview" class="card preview" style="display: none">
+          <h2>Your Mockup</h2>
+          <img id="previewImage" src="" alt="Generated mockup" />
+          <a
+            id="downloadBtn"
+            href="#"
+            download="mockup.png"
+            class="download-btn"
+            >Download Mockup</a
+          >
+        </div>
+      </div>
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const form = document.getElementById('mockupForm');
-            const nameInput = document.getElementById('name');
-            const emailInput = document.getElementById('email');
-            const phoneInput = document.getElementById('phone');
-            const logoInput = document.getElementById('logo');
-            const submitBtn = document.getElementById('submitBtn');
-            const errorDiv = document.getElementById('error');
-            const loadingDiv = document.getElementById('loading');
-            const previewDiv = document.getElementById('preview');
-            const previewImage = document.getElementById('previewImage');
-            const downloadBtn = document.getElementById('downloadBtn');
+      document.addEventListener("DOMContentLoaded", function () {
+        const form = document.getElementById("mockupForm");
+        const nameInput = document.getElementById("name");
+        const emailInput = document.getElementById("email");
+        const phoneInput = document.getElementById("phone");
+        const logoInput = document.getElementById("logo");
+        const submitBtn = document.getElementById("submitBtn");
+        const errorDiv = document.getElementById("error");
+        const loadingDiv = document.getElementById("loading");
+        const previewDiv = document.getElementById("preview");
+        const previewImage = document.getElementById("previewImage");
+        const downloadBtn = document.getElementById("downloadBtn");
 
-            form.addEventListener('submit', async function(e) {
-                e.preventDefault();
-                
-                const logo = logoInput.files[0];
-                if (!logo) {
-                    showError('Please select a logo file');
-                    return;
-                }
+        form.addEventListener("submit", async function (e) {
+          e.preventDefault();
 
-                const allowedTypes = ['application/pdf', 'image/png', 'image/jpeg'];
-                if (!allowedTypes.includes(logo.type)) {
-                    showError('Please upload a PDF, PNG, or JPG file');
-                    return;
-                }
+          const logo = logoInput.files[0];
+          if (!logo) {
+            showError("Please select a logo file");
+            return;
+          }
 
-                // Hide error and preview, show loading
-                errorDiv.style.display = 'none';
-                previewDiv.style.display = 'none';
-                loadingDiv.style.display = 'block';
-                submitBtn.disabled = true;
+          const allowedTypes = ["application/pdf", "image/png", "image/jpeg"];
+          if (!allowedTypes.includes(logo.type)) {
+            showError("Please upload a PDF, PNG, or JPG file");
+            return;
+          }
 
-                try {
-                    const formData = new FormData();
-                    formData.append('name', nameInput.value);
-                    formData.append('email', emailInput.value);
-                    formData.append('phone', phoneInput.value);
-                    formData.append('logo', logo);
+          // Hide error and preview, show loading
+          errorDiv.style.display = "none";
+          previewDiv.style.display = "none";
+          loadingDiv.style.display = "block";
+          submitBtn.disabled = true;
 
-                    const response = await fetch('http://localhost:3000/api/mockup', {
-                        method: 'POST',
-                        body: formData
-                    });
+          try {
+            const formData = new FormData();
+            formData.append("name", nameInput.value);
+            formData.append("email", emailInput.value);
+            formData.append("phone", phoneInput.value);
+            formData.append("logo", logo);
 
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.error || 'Failed to generate mockup');
-                    }
+            // Get the selected processing method
+            const processingMethod = document.querySelector(
+              'input[name="processingMethod"]:checked'
+            ).value;
 
-                    const data = await response.json();
-                    
-                    // Display the mockup
-                    previewImage.src = data.image;
-                    downloadBtn.href = data.image;
-                    
-                    // Hide loading, show preview
-                    loadingDiv.style.display = 'none';
-                    previewDiv.style.display = 'block';
-                } catch (error) {
-                    loadingDiv.style.display = 'none';
-                    showError(error.message || 'An error occurred during mockup generation');
-                } finally {
-                    submitBtn.disabled = false;
-                }
+            // Determine the endpoint based on the selected method
+            let endpoint = "http://localhost:3000/api/mockup";
+            if (processingMethod === "lambda") {
+              endpoint = "http://localhost:3000/api/mockup/lambda";
+            } else if (processingMethod === "cloudinary") {
+              endpoint = "http://localhost:3000/api/mockup/cloudinary";
+            }
+
+            console.log(`Using endpoint: ${endpoint}`);
+
+            const response = await fetch(endpoint, {
+              method: "POST",
+              body: formData,
             });
 
-            function showError(message) {
-                errorDiv.textContent = message;
-                errorDiv.style.display = 'block';
+            if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(errorData.error || "Failed to generate mockup");
             }
+
+            const data = await response.json();
+
+            // Display the mockup
+            previewImage.src = data.image;
+            downloadBtn.href = data.image;
+
+            // Hide loading, show preview
+            loadingDiv.style.display = "none";
+            previewDiv.style.display = "block";
+          } catch (error) {
+            loadingDiv.style.display = "none";
+            showError(
+              error.message || "An error occurred during mockup generation"
+            );
+          } finally {
+            submitBtn.disabled = false;
+          }
         });
+
+        function showError(message) {
+          errorDiv.textContent = message;
+          errorDiv.style.display = "block";
+        }
+      });
     </script>
-</body>
+  </body>
 </html>
