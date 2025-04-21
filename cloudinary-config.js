@@ -190,36 +190,50 @@ async function generateMockupWithCloudinary(logoUrl, options = {}) {
     // Generate a unique ID for this mockup
     const mockupId = `mockup-${Date.now()}`;
 
-    // Create a new image with a simpler approach
-    // Instead of using explicit, we'll use the URL API to generate a transformation URL
+    // Use a structured approach for generating the transformation URL
+    // This will create a properly formatted Cloudinary URL
 
-    // First, let's create a simpler transformation string
-    let transformationStr = `c_fill,w_1920,h_1080`;
+    // Create a new transformation array
+    const transformations = [];
 
-    // Add slipper overlays
-    for (let i = 0; i < slipperPositions.length; i++) {
-      const pos = slipperPositions[i];
-      const x = Math.floor(pos.x - slipperWidth / 2);
-      const y = Math.floor(pos.y - slipperHeight / 2);
-      transformationStr += `/l_${logoPublicId},w_${slipperWidth},h_${slipperHeight},c_scale,g_north_west,x_${x},y_${y}`;
-    }
+    // Add the background image transformation
+    transformations.push({
+      width: 1920,
+      height: 1080,
+      crop: "fill",
+    });
 
-    // Add label overlays
-    for (let i = 0; i < labelPositions.length; i++) {
-      const pos = labelPositions[i];
-      const x = Math.floor(pos.x - labelWidth / 2);
-      const y = Math.floor(pos.y - labelHeight / 2);
-      transformationStr += `/l_${logoPublicId},w_${labelWidth},h_${labelHeight},c_scale,g_north_west,x_${x},y_${y}`;
-    }
-
-    // Generate the URL
+    // Generate the URL using the Cloudinary SDK's url method with proper formatting
     const mockupUrl = cloudinary.url(backgroundPublicId, {
-      transformation: transformationStr,
+      transformation: [
+        { width: 1920, height: 1080, crop: "fill" },
+        ...slipperPositions.map((pos) => ({
+          overlay: logoPublicId,
+          width: slipperWidth,
+          height: slipperHeight,
+          crop: "scale",
+          gravity: "north_west",
+          x: Math.floor(pos.x - slipperWidth / 2),
+          y: Math.floor(pos.y - slipperHeight / 2),
+        })),
+        ...labelPositions.map((pos) => ({
+          overlay: logoPublicId,
+          width: labelWidth,
+          height: labelHeight,
+          crop: "scale",
+          gravity: "north_west",
+          x: Math.floor(pos.x - labelWidth / 2),
+          y: Math.floor(pos.y - labelHeight / 2),
+        })),
+      ],
       sign_url: true,
       secure: true,
     });
 
-    console.log("Generated mockup URL:", mockupUrl);
+    console.log(
+      "Generated mockup URL with structured transformations:",
+      mockupUrl
+    );
 
     // Return the URL directly
     const result = { secure_url: mockupUrl };
