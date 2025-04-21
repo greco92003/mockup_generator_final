@@ -10,6 +10,7 @@ const Jimp = require("jimp");
 const { v4: uuidv4 } = require("uuid");
 const activeCampaign = require("./active-campaign-api");
 const supabaseStorage = require("./supabase-storage");
+const cloudinaryConfig = require("./cloudinary-config");
 
 // Load environment variables
 dotenv.config();
@@ -327,7 +328,84 @@ async function saveMockupToPublic(mockupPath, email) {
   }
 }
 
-// API endpoint for mockup generation with ActiveCampaign integration
+// API endpoint for mockup generation with Cloudinary and ActiveCampaign integration
+app.post("/api/mockup/cloudinary", upload.single("logo"), async (req, res) => {
+  let logoUrl = null;
+
+  try {
+    console.log("Received mockup generation request (Cloudinary)");
+    const { name, email, phone } = req.body;
+
+    console.log(`Request data: email=${email}, name=${name}`);
+
+    if (!req.file) {
+      console.log("Error: Logo file is missing");
+      return res.status(400).json({ error: "Logo file is required" });
+    }
+
+    if (!email) {
+      console.log("Error: Email is missing");
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    const mime = req.file.mimetype;
+    console.log(`File type: ${mime}, size: ${req.file.size} bytes`);
+
+    // Upload logo to Cloudinary
+    console.log("Uploading logo to Cloudinary...");
+    const uploadResult = await cloudinaryConfig.uploadToCloudinary(
+      req.file.buffer,
+      req.file.originalname,
+      "logos"
+    );
+
+    logoUrl = uploadResult.secure_url;
+    console.log(`Logo uploaded to Cloudinary: ${logoUrl}`);
+
+    // Generate mockup using Cloudinary transformations
+    console.log("Generating mockup with Cloudinary...");
+    const mockupUrl = await cloudinaryConfig.generateMockupWithCloudinary(
+      logoUrl
+    );
+    console.log(`Mockup generated: ${mockupUrl}`);
+
+    // Process lead in ActiveCampaign
+    console.log("Processing lead in ActiveCampaign...");
+    try {
+      await activeCampaign.processLeadWithMockup(
+        { email, name, phone },
+        mockupUrl
+      );
+      console.log("Lead processed in ActiveCampaign successfully");
+    } catch (acError) {
+      console.error("Error processing lead in ActiveCampaign:", acError);
+      // Continue even if ActiveCampaign fails
+    }
+
+    // Return the result with WhatsApp redirect URL
+    const response = {
+      name,
+      email,
+      phone,
+      image: mockupUrl,
+      url: mockupUrl,
+      redirect_url: WHATSAPP_REDIRECT_URL,
+    };
+
+    console.log("Sending successful response");
+    res.json(response);
+  } catch (error) {
+    console.error("Error processing request with Cloudinary:", error);
+    console.error("Stack trace:", error.stack);
+    res.status(500).json({
+      error: "Failed to generate mockup with Cloudinary",
+      message: error.message,
+      stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
+    });
+  }
+});
+
+// Original API endpoint for mockup generation with ActiveCampaign integration
 app.post("/api/mockup", upload.single("logo"), async (req, res) => {
   let logoPath = null;
   let mockupPath = null;
