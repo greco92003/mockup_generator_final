@@ -1,5 +1,5 @@
-const cloudinary = require('cloudinary').v2;
-const dotenv = require('dotenv');
+const cloudinary = require("cloudinary").v2;
+const dotenv = require("dotenv");
 
 // Load environment variables
 dotenv.config();
@@ -9,7 +9,7 @@ cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
-  secure: true
+  secure: true,
 });
 
 /**
@@ -19,38 +19,54 @@ cloudinary.config({
  * @param {string} folder - Folder to upload to
  * @returns {Promise<object>} - Cloudinary upload result
  */
-async function uploadToCloudinary(fileBuffer, fileName, folder = 'logos') {
+async function uploadToCloudinary(fileBuffer, fileName, folder = "logos") {
   try {
     console.log(`Uploading file to Cloudinary: ${fileName}`);
-    
+
+    // Generate a unique ID for the file
+    const publicId = `logo-${Date.now()}`;
+    console.log(`Generated public ID: ${publicId}`);
+
     return new Promise((resolve, reject) => {
+      const uploadOptions = {
+        folder,
+        public_id: publicId,
+        resource_type: "auto",
+        format: "png",
+        transformation: [
+          { background: "transparent", flags: "preserve_transparency" },
+        ],
+      };
+
+      console.log("Upload options:", JSON.stringify(uploadOptions));
+
       const uploadStream = cloudinary.uploader.upload_stream(
-        {
-          folder,
-          public_id: `logo-${Date.now()}`,
-          resource_type: 'auto',
-          format: 'png'
-        },
+        uploadOptions,
         (error, result) => {
           if (error) {
-            console.error('Error uploading to Cloudinary:', error);
+            console.error("Error uploading to Cloudinary:", error);
             reject(error);
           } else {
-            console.log('File uploaded to Cloudinary:', result.secure_url);
+            console.log("File uploaded to Cloudinary:");
+            console.log("- Public ID:", result.public_id);
+            console.log("- Secure URL:", result.secure_url);
+            console.log("- Format:", result.format);
+            console.log("- Resource type:", result.resource_type);
             resolve(result);
           }
         }
       );
-      
+
       // Convert buffer to stream and pipe to uploadStream
-      const { Readable } = require('stream');
+      const { Readable } = require("stream");
       const readableStream = new Readable();
       readableStream.push(fileBuffer);
       readableStream.push(null);
       readableStream.pipe(uploadStream);
     });
   } catch (error) {
-    console.error('Error in uploadToCloudinary:', error);
+    console.error("Error in uploadToCloudinary:", error);
+    console.error("Error stack:", error.stack);
     throw error;
   }
 }
@@ -63,31 +79,50 @@ async function uploadToCloudinary(fileBuffer, fileName, folder = 'logos') {
  */
 async function generateMockupWithCloudinary(logoUrl, options = {}) {
   try {
-    console.log('Generating mockup with Cloudinary...');
-    
-    const {
-      bgUrl = `${process.env.CLOUDINARY_URL || 'https://res.cloudinary.com/' + process.env.CLOUDINARY_CLOUD_NAME}/image/upload/v1/backgrounds/default-bg.png`,
-      width = 1920,
-      height = 1080
-    } = options;
-    
-    // Upload background if it doesn't exist in Cloudinary
-    let backgroundUrl = bgUrl;
-    if (!bgUrl.includes('cloudinary')) {
-      // If background is a local file, upload it to Cloudinary
-      const fs = require('fs');
-      const path = require('path');
-      const defaultBgPath = path.join(__dirname, 'public', 'backgrounds', 'default-bg.png');
-      
-      if (fs.existsSync(defaultBgPath)) {
-        const bgBuffer = fs.readFileSync(defaultBgPath);
-        const bgResult = await uploadToCloudinary(bgBuffer, 'default-bg.png', 'backgrounds');
-        backgroundUrl = bgResult.secure_url;
+    console.log("Generating mockup with Cloudinary...");
+    console.log("Logo URL:", logoUrl);
+
+    // Extract the public ID from the logo URL
+    let logoPublicId = "";
+
+    // Handle different Cloudinary URL formats
+    if (logoUrl.includes("asset.cloudinary.com")) {
+      // Format: https://asset.cloudinary.com/dupepsmcm/f636ed2ebf5c458969c6650e38c841cb
+      const parts = logoUrl.split("/");
+      const assetId = parts[parts.length - 1];
+      // For asset URLs, we need to use the folder and filename pattern we used during upload
+      logoPublicId = `logos/logo-${Date.now()}`;
+      console.log("Using constructed public ID for asset URL:", logoPublicId);
+    } else if (logoUrl.includes("res.cloudinary.com")) {
+      // Format: https://res.cloudinary.com/dupepsmcm/image/upload/v1/logos/logo-123456.png
+      const urlObj = new URL(logoUrl);
+      const pathParts = urlObj.pathname.split("/");
+      // Remove the first empty string, 'image', 'upload', and version
+      pathParts.splice(0, 4);
+      logoPublicId = pathParts.join("/");
+      console.log("Extracted logo public ID from res URL:", logoPublicId);
+    } else {
+      // Try to extract public ID from any URL format
+      const urlObj = new URL(logoUrl);
+      logoPublicId = urlObj.pathname.split("/").pop();
+      console.log("Extracted logo public ID from generic URL:", logoPublicId);
+
+      // If we couldn't extract a meaningful ID, use a default pattern
+      if (!logoPublicId || logoPublicId.length < 5) {
+        logoPublicId = `logos/logo-${Date.now()}`;
+        console.log("Using default public ID pattern:", logoPublicId);
       }
     }
-    
+
+    // Background image - use the one you uploaded to Cloudinary
+    const backgroundPublicId = "backgrounds/default-bg";
+    console.log(`Using background image: ${backgroundPublicId}`);
+
+    // Create a new image with Cloudinary's image overlay capabilities
+    // We'll use a simpler approach with fewer transformations
+
     // Define positions for slippers and labels
-    const slippersCenters = [
+    const slipperPositions = [
       { x: 306, y: 330 }, // Par 1 - Pé Direito
       { x: 487, y: 330 }, // Par 1 - Pé Esquerdo
       { x: 897, y: 330 }, // Par 2 - Pé Direito
@@ -102,7 +137,7 @@ async function generateMockupWithCloudinary(logoUrl, options = {}) {
       { x: 1713, y: 789 }, // Par 6 - Pé Esquerdo
     ];
 
-    const labelCenters = [
+    const labelPositions = [
       { x: 154, y: 367 }, // Etiqueta Par 1
       { x: 738, y: 367 }, // Etiqueta Par 2
       { x: 1377, y: 367 }, // Etiqueta Par 3
@@ -110,55 +145,90 @@ async function generateMockupWithCloudinary(logoUrl, options = {}) {
       { x: 738, y: 825 }, // Etiqueta Par 5
       { x: 1377, y: 825 }, // Etiqueta Par 6
     ];
-    
-    // Define size limits for chinelos and etiquetas
-    const defaultSlipperHeight = 100; // altura padrão para chinelos
-    const defaultLabelHeight = 60; // altura padrão para etiquetas
-    const maxSlipperWidth = 163; // largura máxima para chinelos
-    const maxLabelWidth = 64; // largura máxima para etiquetas
-    
-    // Create a transformation for the background
-    let transformation = [
-      { width, height, crop: 'fill' }
-    ];
-    
-    // Add transformations for slippers
-    slippersCenters.forEach((center, index) => {
-      transformation.push({
-        overlay: new URL(logoUrl).pathname.substring(1),
-        width: maxSlipperWidth,
-        height: defaultSlipperHeight,
-        crop: 'fit',
-        gravity: 'north_west',
-        x: center.x - (maxSlipperWidth / 2),
-        y: center.y - (defaultSlipperHeight / 2)
+
+    // Define size limits
+    const slipperWidth = 163;
+    const slipperHeight = 100;
+    const labelWidth = 64;
+    const labelHeight = 60;
+
+    // Create a simpler transformation
+    // Instead of trying to do everything in one URL, we'll create a new image
+    // with the background and logo overlays
+
+    // Create a new transformation for uploading a composed image
+    const transformation = {
+      transformation: [{ width: 1920, height: 1080, crop: "fill" }],
+    };
+
+    // Add slipper overlays
+    for (const pos of slipperPositions) {
+      transformation.transformation.push({
+        overlay: `l_${logoPublicId}`,
+        width: slipperWidth,
+        height: slipperHeight,
+        x: pos.x - slipperWidth / 2,
+        y: pos.y - slipperHeight / 2,
+        gravity: "north_west",
+        crop: "scale",
       });
-    });
-    
-    // Add transformations for labels
-    labelCenters.forEach((center, index) => {
-      transformation.push({
-        overlay: new URL(logoUrl).pathname.substring(1),
-        width: maxLabelWidth,
-        height: defaultLabelHeight,
-        crop: 'fit',
-        gravity: 'north_west',
-        x: center.x - (maxLabelWidth / 2),
-        y: center.y - (defaultLabelHeight / 2)
+    }
+
+    // Add label overlays
+    for (const pos of labelPositions) {
+      transformation.transformation.push({
+        overlay: `l_${logoPublicId}`,
+        width: labelWidth,
+        height: labelHeight,
+        x: pos.x - labelWidth / 2,
+        y: pos.y - labelHeight / 2,
+        gravity: "north_west",
+        crop: "scale",
       });
+    }
+
+    // Generate a unique ID for this mockup
+    const mockupId = `mockup-${Date.now()}`;
+
+    // Create a new image with a simpler approach
+    // Instead of using explicit, we'll use the URL API to generate a transformation URL
+
+    // First, let's create a simpler transformation string
+    let transformationStr = `c_fill,w_1920,h_1080`;
+
+    // Add slipper overlays
+    for (let i = 0; i < slipperPositions.length; i++) {
+      const pos = slipperPositions[i];
+      const x = Math.floor(pos.x - slipperWidth / 2);
+      const y = Math.floor(pos.y - slipperHeight / 2);
+      transformationStr += `/l_${logoPublicId},w_${slipperWidth},h_${slipperHeight},c_scale,g_north_west,x_${x},y_${y}`;
+    }
+
+    // Add label overlays
+    for (let i = 0; i < labelPositions.length; i++) {
+      const pos = labelPositions[i];
+      const x = Math.floor(pos.x - labelWidth / 2);
+      const y = Math.floor(pos.y - labelHeight / 2);
+      transformationStr += `/l_${logoPublicId},w_${labelWidth},h_${labelHeight},c_scale,g_north_west,x_${x},y_${y}`;
+    }
+
+    // Generate the URL
+    const mockupUrl = cloudinary.url(backgroundPublicId, {
+      transformation: transformationStr,
+      sign_url: true,
+      secure: true,
     });
-    
-    // Generate the mockup URL
-    const mockupUrl = cloudinary.url(new URL(backgroundUrl).pathname.substring(1), {
-      transformation,
-      sign_url: true
-    });
-    
-    console.log('Mockup URL generated:', mockupUrl);
-    
-    return mockupUrl;
+
+    console.log("Generated mockup URL:", mockupUrl);
+
+    // Return the URL directly
+    const result = { secure_url: mockupUrl };
+
+    // Return the secure URL of the generated mockup
+    return result.secure_url;
   } catch (error) {
-    console.error('Error generating mockup with Cloudinary:', error);
+    console.error("Error generating mockup with Cloudinary:", error);
+    console.error("Error stack:", error.stack);
     throw error;
   }
 }
@@ -172,16 +242,16 @@ async function generateMockupWithCloudinary(logoUrl, options = {}) {
 async function saveMockupUrl(mockupUrl, email) {
   try {
     console.log(`Saving mockup URL for email: ${email}`);
-    
+
     // Generate a unique ID for the mockup
     const mockupId = `mockup-${Date.now()}`;
-    
+
     // In a production environment, you would save this to a database
     // For now, we'll just return the URL
-    
+
     return mockupUrl;
   } catch (error) {
-    console.error('Error saving mockup URL:', error);
+    console.error("Error saving mockup URL:", error);
     throw error;
   }
 }
@@ -190,5 +260,5 @@ module.exports = {
   cloudinary,
   uploadToCloudinary,
   generateMockupWithCloudinary,
-  saveMockupUrl
+  saveMockupUrl,
 };
