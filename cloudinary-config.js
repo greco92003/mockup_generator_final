@@ -1,7 +1,7 @@
-const cloudinary = require('cloudinary').v2;
-const dotenv = require('dotenv');
-const fs = require('fs');
-const path = require('path');
+const cloudinary = require("cloudinary").v2;
+const dotenv = require("dotenv");
+const fs = require("fs");
+const path = require("path");
 
 // Load environment variables
 dotenv.config();
@@ -11,7 +11,7 @@ cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
-  secure: true
+  secure: true,
 });
 
 /**
@@ -93,7 +93,7 @@ async function generateMockupWithCloudinary(logoUrl, options = {}) {
       try {
         const urlObj = new URL(logoUrl);
         const pathParts = urlObj.pathname.split("/");
-        
+
         // Find the index after 'upload'
         let uploadIndex = -1;
         for (let i = 0; i < pathParts.length; i++) {
@@ -102,14 +102,25 @@ async function generateMockupWithCloudinary(logoUrl, options = {}) {
             break;
           }
         }
-        
+
         if (uploadIndex >= 0 && uploadIndex + 2 < pathParts.length) {
           // Skip the version part (usually starts with v) and get everything after
-          logoPublicId = pathParts.slice(uploadIndex + 2).join("/");
+          let fullPath = pathParts.slice(uploadIndex + 2).join("/");
+
+          // Remove file extension if present
+          if (fullPath.includes(".")) {
+            fullPath = fullPath.substring(0, fullPath.lastIndexOf("."));
+          }
+
+          logoPublicId = fullPath;
           console.log("Extracted logo public ID from res URL:", logoPublicId);
         } else {
-          // Fallback to just the filename
-          logoPublicId = pathParts[pathParts.length - 1];
+          // Fallback to just the filename without extension
+          let filename = pathParts[pathParts.length - 1];
+          if (filename.includes(".")) {
+            filename = filename.substring(0, filename.lastIndexOf("."));
+          }
+          logoPublicId = filename;
           console.log("Extracted logo filename as public ID:", logoPublicId);
         }
       } catch (e) {
@@ -121,13 +132,20 @@ async function generateMockupWithCloudinary(logoUrl, options = {}) {
       try {
         const urlObj = new URL(logoUrl);
         const pathParts = urlObj.pathname.split("/");
-        logoPublicId = pathParts[pathParts.length - 1];
-        
+        let filename = pathParts[pathParts.length - 1];
+
+        // Remove file extension if present
+        if (filename.includes(".")) {
+          filename = filename.substring(0, filename.lastIndexOf("."));
+        }
+
         // If it's an asset ID, construct a full public ID
         if (logoUrl.includes("asset.cloudinary.com")) {
           logoPublicId = `logos/logo-${Date.now()}`;
+        } else {
+          logoPublicId = filename;
         }
-        
+
         console.log("Extracted logo public ID:", logoPublicId);
       } catch (e) {
         console.error("Error parsing URL:", e);
@@ -173,58 +191,80 @@ async function generateMockupWithCloudinary(logoUrl, options = {}) {
     // Generate a unique ID for this mockup
     const mockupId = `mockup-${Date.now()}`;
     const mockupPublicId = `mockups/${mockupId}`;
-    
+
     console.log("Creating new mockup with ID:", mockupPublicId);
-    
+
     // Create an array of transformations to apply to the background image
     const transformations = [];
-    
+
     // Add slipper overlays
     for (const pos of slipperPositions) {
       const x = Math.floor(pos.x - slipperWidth / 2);
       const y = Math.floor(pos.y - slipperHeight / 2);
       transformations.push({
-        overlay: logoPublicId,
+        overlay: `${process.env.CLOUDINARY_CLOUD_NAME}:${logoPublicId}`,
         width: slipperWidth,
         height: slipperHeight,
         crop: "scale",
         gravity: "north_west",
         x: x,
-        y: y
+        y: y,
       });
     }
-    
+
     // Add label overlays
     for (const pos of labelPositions) {
       const x = Math.floor(pos.x - labelWidth / 2);
       const y = Math.floor(pos.y - labelHeight / 2);
       transformations.push({
-        overlay: logoPublicId,
+        overlay: `${process.env.CLOUDINARY_CLOUD_NAME}:${logoPublicId}`,
         width: labelWidth,
         height: labelHeight,
         crop: "scale",
         gravity: "north_west",
         x: x,
-        y: y
+        y: y,
       });
     }
-    
-    console.log(`Uploading new image with ${transformations.length} overlays...`);
-    
-    // Use the Cloudinary API to create a new image by cloning the background
-    // and applying all the transformations
+
+    console.log(
+      `Uploading new image with ${transformations.length} overlays...`
+    );
+
+    // Use a simpler approach - create a new image with explicit transformations
+    console.log("Creating a new mockup with explicit transformations...");
+
+    // First, let's create a new transformation array in the format Cloudinary expects
+    const explicitTransformations = [];
+
+    // Start with the background image
+    explicitTransformations.push({ width: 1920, height: 1080, crop: "fill" });
+
+    // Add all the overlays
+    for (const transform of transformations) {
+      explicitTransformations.push(transform);
+    }
+
+    // Log the transformations for debugging
+    console.log(
+      "Using transformations:",
+      JSON.stringify(explicitTransformations)
+    );
+
+    // Use the Cloudinary API to create a new image
     const result = await new Promise((resolve, reject) => {
       cloudinary.uploader.upload(
         `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/image/upload/${backgroundPublicId}`,
         {
           public_id: mockupPublicId,
           overwrite: true,
-          transformation: transformations,
-          format: "png"
+          transformation: explicitTransformations,
+          format: "png",
         },
         (error, result) => {
           if (error) {
             console.error("Error creating mockup with Cloudinary:", error);
+            console.error("Error details:", JSON.stringify(error));
             reject(error);
           } else {
             console.log("Mockup created successfully:");
@@ -236,7 +276,7 @@ async function generateMockupWithCloudinary(logoUrl, options = {}) {
         }
       );
     });
-    
+
     // Return the secure URL of the generated mockup
     return result.secure_url;
   } catch (error) {
@@ -255,16 +295,16 @@ async function generateMockupWithCloudinary(logoUrl, options = {}) {
 async function saveMockupUrl(mockupUrl, email) {
   try {
     console.log(`Saving mockup URL for email: ${email}`);
-    
+
     // Generate a unique ID for the mockup
     const mockupId = `mockup-${Date.now()}`;
-    
+
     // In a production environment, you would save this to a database
     // For now, we'll just return the URL
-    
+
     return mockupUrl;
   } catch (error) {
-    console.error('Error saving mockup URL:', error);
+    console.error("Error saving mockup URL:", error);
     throw error;
   }
 }
@@ -273,5 +313,5 @@ module.exports = {
   cloudinary,
   uploadToCloudinary,
   generateMockupWithCloudinary,
-  saveMockupUrl
+  saveMockupUrl,
 };
