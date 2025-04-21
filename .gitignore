@@ -1,0 +1,55 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependências
+node_modules
+.pnp
+.pnp.js
+
+# Arquivos de build
+dist
+dist-ssr
+build
+out
+.next
+
+# Arquivos de ambiente
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.local
+
+# Diretórios de cache
+.npm
+.eslintcache
+.vercel
+
+# Arquivos temporários
+temp/*
+!temp/.gitkeep
+tmp
+*.tmp
+*.temp
+
+# Diretórios de upload
+public/mockups/*
+!public/mockups/.gitkeep
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

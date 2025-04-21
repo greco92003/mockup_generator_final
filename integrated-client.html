@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gerador de Mockups - HUD LAB</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    
+    h1 {
+      color: #2c3e50;
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    
+    .form-container {
+      background-color: #fff;
+      border-radius: 8px;
+      padding: 30px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      margin-bottom: 30px;
+    }
+    
+    .form-group {
+      margin-bottom: 20px;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+    
+    input[type="text"],
+    input[type="email"],
+    input[type="tel"] {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 16px;
+      transition: border-color 0.3s;
+    }
+    
+    input[type="text"]:focus,
+    input[type="email"]:focus,
+    input[type="tel"]:focus {
+      border-color: #3498db;
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+    }
+    
+    .file-input-container {
+      position: relative;
+      margin-top: 10px;
+    }
+    
+    .file-input-label {
+      display: inline-block;
+      background-color: #e9ecef;
+      color: #495057;
+      padding: 12px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      border: 1px solid #ced4da;
+      width: 100%;
+      box-sizing: border-box;
+      text-align: center;
+      transition: all 0.3s;
+    }
+    
+    .file-input-label:hover {
+      background-color: #dde2e6;
+    }
+    
+    .file-input {
+      position: absolute;
+      left: -9999px;
+    }
+    
+    .file-name {
+      margin-top: 8px;
+      font-size: 14px;
+      color: #6c757d;
+    }
+    
+    button {
+      background-color: #3498db;
+      color: white;
+      border: none;
+      padding: 14px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: 600;
+      width: 100%;
+      transition: background-color 0.3s;
+    }
+    
+    button:hover {
+      background-color: #2980b9;
+    }
+    
+    .result-container {
+      background-color: #fff;
+      border-radius: 8px;
+      padding: 30px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      margin-top: 30px;
+      text-align: center;
+      display: none;
+    }
+    
+    .mockup-image {
+      max-width: 100%;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      margin-bottom: 20px;
+    }
+    
+    .info-box {
+      background-color: #e8f4fd;
+      border-left: 4px solid #3498db;
+      padding: 15px;
+      margin-bottom: 20px;
+      border-radius: 4px;
+    }
+    
+    .error-message {
+      color: #e74c3c;
+      font-weight: 600;
+      margin-top: 5px;
+      display: none;
+    }
+    
+    .loading {
+      display: none;
+      text-align: center;
+      margin: 20px 0;
+    }
+    
+    .loading-spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #3498db;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 10px;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .success-message {
+      background-color: #d4edda;
+      color: #155724;
+      padding: 15px;
+      border-radius: 4px;
+      margin-top: 20px;
+      text-align: center;
+      display: none;
+    }
+    
+    .download-link {
+      display: inline-block;
+      background-color: #2ecc71;
+      color: white;
+      text-decoration: none;
+      padding: 12px 24px;
+      border-radius: 4px;
+      margin-top: 15px;
+      font-weight: 600;
+      transition: background-color 0.3s;
+    }
+    
+    .download-link:hover {
+      background-color: #27ae60;
+    }
+    
+    .whatsapp-button {
+      display: inline-block;
+      background-color: #25D366;
+      color: white;
+      text-decoration: none;
+      padding: 12px 24px;
+      border-radius: 4px;
+      margin-top: 15px;
+      font-weight: 600;
+      transition: background-color 0.3s;
+    }
+    
+    .whatsapp-button:hover {
+      background-color: #128C7E;
+    }
+    
+    .whatsapp-icon {
+      margin-right: 8px;
+    }
+    
+    .redirect-message {
+      background-color: #d5f5e3;
+      border-left: 4px solid #2ecc71;
+      padding: 15px;
+      border-radius: 4px;
+      margin-top: 20px;
+      text-align: center;
+      display: none;
+    }
+    
+    .countdown {
+      font-weight: bold;
+      font-size: 18px;
+    }
+    
+    .logo-requirements {
+      margin-top: 10px;
+      font-size: 14px;
+      color: #6c757d;
+    }
+    
+    .logo-requirements ul {
+      padding-left: 20px;
+      margin-top: 5px;
+    }
+    
+    .logo-requirements li {
+      margin-bottom: 3px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Gerador de Mockups - HUD LAB</h1>
+  
+  <div class="info-box">
+    <p>Faça upload do seu logo para gerar um mockup personalizado de chinelos. Após o envio, você será redirecionado para o WhatsApp para continuar o atendimento.</p>
+    <p><strong>Formatos aceitos:</strong> PNG, JPG (recomendado) ou PDF.</p>
+  </div>
+  
+  <div class="form-container">
+    <form id="mockupForm">
+      <div class="form-group">
+        <label for="name">Nome Completo:</label>
+        <input type="text" id="name" name="name" placeholder="Seu nome completo" required>
+      </div>
+      
+      <div class="form-group">
+        <label for="email">Email:</label>
+        <input type="email" id="email" name="email" placeholder="seu.email@exemplo.com" required>
+        <div class="error-message" id="emailError">Por favor, insira um email válido.</div>
+      </div>
+      
+      <div class="form-group">
+        <label for="phone">WhatsApp (com DDD):</label>
+        <input type="tel" id="phone" name="phone" placeholder="11999999999" required>
+        <div class="error-message" id="phoneError">Por favor, insira um número válido com DDD.</div>
+      </div>
+      
+      <div class="form-group">
+        <label for="logo">Logo:</label>
+        <div class="file-input-container">
+          <label for="logo" class="file-input-label">Escolher arquivo</label>
+          <input type="file" id="logo" name="logo" accept=".png,.jpg,.jpeg,.pdf" class="file-input" required>
+          <div class="file-name" id="fileName">Nenhum arquivo selecionado</div>
+        </div>
+        <div class="error-message" id="logoError">Por favor, selecione um arquivo PNG, JPG ou PDF.</div>
+        <div class="logo-requirements">
+          <p>Requisitos para o logo:</p>
+          <ul>
+            <li>Tamanho máximo para chinelos: 163px de largura, 100px de altura</li>
+            <li>Tamanho máximo para etiquetas: 64px de largura, 60px de altura</li>
+            <li>Preferencialmente com fundo transparente</li>
+          </ul>
+        </div>
+      </div>
+      
+      <button type="submit" id="submitBtn">Gerar Mockup</button>
+    </form>
+  </div>
+  
+  <div class="loading" id="loading">
+    <div class="loading-spinner"></div>
+    <p>Gerando seu mockup, aguarde um momento...</p>
+  </div>
+  
+  <div class="result-container" id="resultContainer">
+    <h2>Seu Mockup</h2>
+    <img id="mockupImage" class="mockup-image" alt="Mockup gerado">
+    
+    <div class="success-message" id="successMessage">
+      <p>Mockup gerado com sucesso!</p>
+      <a href="#" id="downloadLink" class="download-link" download="mockup.png">Baixar Mockup</a>
+    </div>
+    
+    <div class="redirect-message" id="redirectMessage">
+      <p>Você será redirecionado para o WhatsApp em <span id="countdown" class="countdown">5</span> segundos...</p>
+      <p>Ou clique no botão abaixo para continuar:</p>
+      <a href="#" id="whatsappButton" class="whatsapp-button" target="_blank">
+        <span class="whatsapp-icon">📱</span> Continuar no WhatsApp
+      </a>
+    </div>
+  </div>
+  
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const form = document.getElementById('mockupForm');
+      const loading = document.getElementById('loading');
+      const resultContainer = document.getElementById('resultContainer');
+      const mockupImage = document.getElementById('mockupImage');
+      const downloadLink = document.getElementById('downloadLink');
+      const successMessage = document.getElementById('successMessage');
+      const redirectMessage = document.getElementById('redirectMessage');
+      const whatsappButton = document.getElementById('whatsappButton');
+      const countdown = document.getElementById('countdown');
+      const emailError = document.getElementById('emailError');
+      const phoneError = document.getElementById('phoneError');
+      const logoError = document.getElementById('logoError');
+      const fileInput = document.getElementById('logo');
+      const fileName = document.getElementById('fileName');
+      
+      // Update file name when file is selected
+      fileInput.addEventListener('change', function() {
+        if (this.files && this.files[0]) {
+          fileName.textContent = this.files[0].name;
+        } else {
+          fileName.textContent = 'Nenhum arquivo selecionado';
+        }
+      });
+      
+      form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        // Reset error messages
+        emailError.style.display = 'none';
+        phoneError.style.display = 'none';
+        logoError.style.display = 'none';
+        
+        // Validate email
+        const email = document.getElementById('email').value;
+        if (!email || !email.includes('@')) {
+          emailError.style.display = 'block';
+          return;
+        }
+        
+        // Validate phone
+        const phone = document.getElementById('phone').value;
+        if (!phone || phone.length < 10) {
+          phoneError.style.display = 'block';
+          return;
+        }
+        
+        // Validate logo file
+        const logoFile = document.getElementById('logo').files[0];
+        if (!logoFile) {
+          logoError.style.display = 'block';
+          return;
+        }
+        
+        // Check file type
+        const validTypes = ['image/png', 'image/jpeg', 'application/pdf'];
+        if (!validTypes.includes(logoFile.type)) {
+          logoError.style.display = 'block';
+          return;
+        }
+        
+        // Show loading
+        loading.style.display = 'block';
+        resultContainer.style.display = 'none';
+        
+        // Create form data
+        const formData = new FormData();
+        formData.append('name', document.getElementById('name').value);
+        formData.append('email', email);
+        formData.append('phone', phone);
+        formData.append('logo', logoFile);
+        
+        try {
+          // Send request to server
+          const response = await fetch('/api/mockup', {
+            method: 'POST',
+            body: formData
+          });
+          
+          if (!response.ok) {
+            throw new Error('Failed to generate mockup');
+          }
+          
+          const data = await response.json();
+          
+          // Display result
+          mockupImage.src = data.image;
+          downloadLink.href = data.url;
+          whatsappButton.href = data.redirect_url;
+          
+          // Show result container
+          loading.style.display = 'none';
+          resultContainer.style.display = 'block';
+          successMessage.style.display = 'block';
+          redirectMessage.style.display = 'block';
+          
+          // Start countdown for WhatsApp redirect
+          let secondsLeft = 5;
+          const countdownInterval = setInterval(() => {
+            secondsLeft--;
+            countdown.textContent = secondsLeft;
+            
+            if (secondsLeft <= 0) {
+              clearInterval(countdownInterval);
+              window.location.href = data.redirect_url;
+            }
+          }, 1000);
+          
+          // Reset form
+          form.reset();
+          fileName.textContent = 'Nenhum arquivo selecionado';
+          
+        } catch (error) {
+          console.error('Error:', error);
+          alert('Ocorreu um erro ao gerar o mockup. Por favor, tente novamente.');
+          loading.style.display = 'none';
+        }
+      });
+    });
+  </script>
+</body>
+</html>

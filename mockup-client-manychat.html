@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gerador de Mockups - Integração ManyChat</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    
+    h1 {
+      color: #2c3e50;
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    
+    .form-container {
+      background-color: #f9f9f9;
+      border-radius: 8px;
+      padding: 30px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .form-group {
+      margin-bottom: 20px;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+    
+    input[type="text"],
+    input[type="email"],
+    input[type="tel"] {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 16px;
+    }
+    
+    .file-input {
+      margin-top: 10px;
+    }
+    
+    button {
+      background-color: #3498db;
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: 600;
+      width: 100%;
+      transition: background-color 0.3s;
+    }
+    
+    button:hover {
+      background-color: #2980b9;
+    }
+    
+    .result-container {
+      margin-top: 30px;
+      text-align: center;
+      display: none;
+    }
+    
+    .mockup-image {
+      max-width: 100%;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      margin-bottom: 20px;
+    }
+    
+    .info-box {
+      background-color: #e8f4fd;
+      border-left: 4px solid #3498db;
+      padding: 15px;
+      margin-bottom: 20px;
+      border-radius: 4px;
+    }
+    
+    .error-message {
+      color: #e74c3c;
+      font-weight: 600;
+      margin-top: 5px;
+      display: none;
+    }
+    
+    .loading {
+      display: none;
+      text-align: center;
+      margin: 20px 0;
+    }
+    
+    .loading-spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #3498db;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 10px;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .success-message {
+      background-color: #d4edda;
+      color: #155724;
+      padding: 15px;
+      border-radius: 4px;
+      margin-top: 20px;
+      text-align: center;
+      display: none;
+    }
+    
+    .download-link {
+      display: inline-block;
+      background-color: #2ecc71;
+      color: white;
+      text-decoration: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      margin-top: 15px;
+      font-weight: 600;
+      transition: background-color 0.3s;
+    }
+    
+    .download-link:hover {
+      background-color: #27ae60;
+    }
+    
+    .whatsapp-info {
+      margin-top: 20px;
+      background-color: #d5f5e3;
+      border-left: 4px solid #2ecc71;
+      padding: 15px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Gerador de Mockups</h1>
+  
+  <div class="info-box">
+    <p>Faça upload do seu logo para gerar um mockup personalizado. Você receberá o resultado por WhatsApp!</p>
+    <p><strong>Formatos aceitos:</strong> PNG, JPG (recomendado) ou PDF.</p>
+  </div>
+  
+  <div class="form-container">
+    <form id="mockupForm">
+      <div class="form-group">
+        <label for="name">Nome:</label>
+        <input type="text" id="name" name="name" required>
+      </div>
+      
+      <div class="form-group">
+        <label for="email">Email:</label>
+        <input type="email" id="email" name="email" required>
+        <div class="error-message" id="emailError">Por favor, insira um email válido.</div>
+      </div>
+      
+      <div class="form-group">
+        <label for="phone">WhatsApp (com DDD):</label>
+        <input type="tel" id="phone" name="phone" placeholder="11999999999" required>
+        <div class="error-message" id="phoneError">Por favor, insira um número válido com DDD.</div>
+      </div>
+      
+      <div class="form-group">
+        <label for="logo">Logo:</label>
+        <input type="file" id="logo" name="logo" accept=".png,.jpg,.jpeg,.pdf" class="file-input" required>
+        <div class="error-message" id="logoError">Por favor, selecione um arquivo PNG, JPG ou PDF.</div>
+      </div>
+      
+      <button type="submit" id="submitBtn">Gerar Mockup</button>
+    </form>
+  </div>
+  
+  <div class="loading" id="loading">
+    <div class="loading-spinner"></div>
+    <p>Gerando seu mockup, aguarde um momento...</p>
+  </div>
+  
+  <div class="result-container" id="resultContainer">
+    <h2>Seu Mockup</h2>
+    <img id="mockupImage" class="mockup-image" alt="Mockup gerado">
+    
+    <div class="success-message" id="successMessage">
+      <p>Mockup gerado com sucesso!</p>
+      <a href="#" id="downloadLink" class="download-link" download="mockup.png">Baixar Mockup</a>
+    </div>
+    
+    <div class="whatsapp-info">
+      <p><strong>Enviamos seu mockup para o WhatsApp!</strong></p>
+      <p>Verifique seu WhatsApp para receber o mockup em alta resolução.</p>
+    </div>
+  </div>
+  
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const form = document.getElementById('mockupForm');
+      const loading = document.getElementById('loading');
+      const resultContainer = document.getElementById('resultContainer');
+      const mockupImage = document.getElementById('mockupImage');
+      const downloadLink = document.getElementById('downloadLink');
+      const successMessage = document.getElementById('successMessage');
+      const emailError = document.getElementById('emailError');
+      const phoneError = document.getElementById('phoneError');
+      const logoError = document.getElementById('logoError');
+      
+      form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        // Reset error messages
+        emailError.style.display = 'none';
+        phoneError.style.display = 'none';
+        logoError.style.display = 'none';
+        
+        // Validate email
+        const email = document.getElementById('email').value;
+        if (!email || !email.includes('@')) {
+          emailError.style.display = 'block';
+          return;
+        }
+        
+        // Validate phone
+        const phone = document.getElementById('phone').value;
+        if (!phone || phone.length < 10) {
+          phoneError.style.display = 'block';
+          return;
+        }
+        
+        // Validate logo file
+        const logoFile = document.getElementById('logo').files[0];
+        if (!logoFile) {
+          logoError.style.display = 'block';
+          return;
+        }
+        
+        // Check file type
+        const validTypes = ['image/png', 'image/jpeg', 'application/pdf'];
+        if (!validTypes.includes(logoFile.type)) {
+          logoError.style.display = 'block';
+          return;
+        }
+        
+        // Show loading
+        loading.style.display = 'block';
+        resultContainer.style.display = 'none';
+        
+        // Create form data
+        const formData = new FormData();
+        formData.append('name', document.getElementById('name').value);
+        formData.append('email', email);
+        formData.append('phone', phone);
+        formData.append('logo', logoFile);
+        
+        try {
+          // Send request to server
+          const response = await fetch('/api/mockup', {
+            method: 'POST',
+            body: formData
+          });
+          
+          if (!response.ok) {
+            throw new Error('Failed to generate mockup');
+          }
+          
+          const data = await response.json();
+          
+          // Display result
+          mockupImage.src = data.image;
+          downloadLink.href = data.url;
+          
+          // Show result container
+          loading.style.display = 'none';
+          resultContainer.style.display = 'block';
+          successMessage.style.display = 'block';
+          
+          // Reset form
+          form.reset();
+          
+        } catch (error) {
+          console.error('Error:', error);
+          alert('Ocorreu um erro ao gerar o mockup. Por favor, tente novamente.');
+          loading.style.display = 'none';
+        }
+      });
+    });
+  </script>
+</body>
+</html>
