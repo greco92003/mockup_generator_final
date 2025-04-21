@@ -27,6 +27,9 @@ out
 .env.production.local
 *.local
 
+# NÃO ignorar o arquivo .env.example
+!.env.example
+
 # Diretórios de cache
 .npm
 .eslintcache
