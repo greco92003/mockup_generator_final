@@ -190,7 +190,7 @@
     <div class="container">
       <h1>Mockup Generator</h1>
       <p class="description">
-        Upload your logo (PDF, PNG, or JPG) and we'll generate a mockup for you
+        Upload your logo (PNG or JPG) and we'll generate a mockup for you
       </p>
 
       <div class="content">
@@ -212,41 +212,14 @@
             </div>
 
             <div class="form-group">
-              <label for="logo">Logo (PDF, PNG, JPG)</label>
+              <label for="logo">Logo (PNG, JPG)</label>
               <input
                 type="file"
                 id="logo"
                 name="logo"
-                accept=".pdf,.png,.jpg,.jpeg"
+                accept=".png,.jpg,.jpeg"
                 required
               />
-            </div>
-
-            <div class="form-group">
-              <label>Processing Method</label>
-              <div class="radio-group">
-                <label class="radio-label">
-                  <input
-                    type="radio"
-                    name="processingMethod"
-                    value="lambda"
-                    checked
-                  />
-                  AWS Lambda (Recommended)
-                </label>
-                <label class="radio-label">
-                  <input
-                    type="radio"
-                    name="processingMethod"
-                    value="cloudinary"
-                  />
-                  Cloudinary
-                </label>
-                <label class="radio-label">
-                  <input type="radio" name="processingMethod" value="local" />
-                  Local Processing
-                </label>
-              </div>
             </div>
 
             <button type="submit" id="submitBtn">Generate Mockup</button>
@@ -296,9 +269,9 @@
             return;
           }
 
-          const allowedTypes = ["application/pdf", "image/png", "image/jpeg"];
+          const allowedTypes = ["image/png", "image/jpeg"];
           if (!allowedTypes.includes(logo.type)) {
-            showError("Please upload a PDF, PNG, or JPG file");
+            showError("Please upload a PNG or JPG file");
             return;
           }
 
@@ -315,19 +288,8 @@
             formData.append("phone", phoneInput.value);
             formData.append("logo", logo);
 
-            // Get the selected processing method
-            const processingMethod = document.querySelector(
-              'input[name="processingMethod"]:checked'
-            ).value;
-
-            // Determine the endpoint based on the selected method
-            let endpoint = "http://localhost:3000/api/mockup";
-            if (processingMethod === "lambda") {
-              endpoint = "http://localhost:3000/api/mockup/lambda";
-            } else if (processingMethod === "cloudinary") {
-              endpoint = "http://localhost:3000/api/mockup/cloudinary";
-            }
-
+            // Use the AWS Lambda endpoint
+            const endpoint = "http://localhost:3000/api/mockup";
             console.log(`Using endpoint: ${endpoint}`);
 
             const response = await fetch(endpoint, {

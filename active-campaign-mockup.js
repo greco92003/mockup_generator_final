@@ -4,14 +4,12 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const dotenv = require("dotenv");
-const CloudConvert = require("cloudconvert");
 const https = require("https");
-const Jimp = require("jimp");
 const { v4: uuidv4 } = require("uuid");
 const activeCampaign = require("./active-campaign-api");
 const supabaseStorage = require("./supabase-storage");
-const cloudinaryConfig = require("./cloudinary-config");
 const awsLambdaConfig = require("./aws-lambda-config");
+const s3Upload = require("./s3-upload");
 
 // Load environment variables
 dotenv.config();
@@ -330,7 +328,7 @@ async function saveMockupToPublic(mockupPath, email) {
 }
 
 // API endpoint for mockup generation with AWS Lambda and ActiveCampaign integration
-app.post("/api/mockup/lambda", upload.single("logo"), async (req, res) => {
+app.post("/api/mockup", upload.single("logo"), async (req, res) => {
   let logoUrl = null;
 
   try {
@@ -352,16 +350,16 @@ app.post("/api/mockup/lambda", upload.single("logo"), async (req, res) => {
     const mime = req.file.mimetype;
     console.log(`File type: ${mime}, size: ${req.file.size} bytes`);
 
-    // Upload logo to Cloudinary (we still use Cloudinary for logo storage)
-    console.log("Uploading logo to Cloudinary...");
-    const uploadResult = await cloudinaryConfig.uploadToCloudinary(
+    // Upload logo to S3
+    console.log("Uploading logo to S3...");
+    const uploadResult = await s3Upload.uploadToS3(
       req.file.buffer,
       req.file.originalname,
       "logos"
     );
 
-    logoUrl = uploadResult.secure_url;
-    console.log(`Logo uploaded to Cloudinary: ${logoUrl}`);
+    logoUrl = uploadResult.url;
+    console.log(`Logo uploaded to S3: ${logoUrl}`);
 
     // Generate mockup using AWS Lambda
     console.log("Generating mockup with AWS Lambda...");
@@ -402,217 +400,6 @@ app.post("/api/mockup/lambda", upload.single("logo"), async (req, res) => {
     console.error("Stack trace:", error.stack);
     res.status(500).json({
       error: "Failed to generate mockup with AWS Lambda",
-      message: error.message,
-      stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
-    });
-  }
-});
-
-// API endpoint for mockup generation with Cloudinary and ActiveCampaign integration
-app.post("/api/mockup/cloudinary", upload.single("logo"), async (req, res) => {
-  let logoUrl = null;
-
-  try {
-    console.log("Received mockup generation request (Cloudinary)");
-    const { name, email, phone } = req.body;
-
-    console.log(`Request data: email=${email}, name=${name}`);
-
-    if (!req.file) {
-      console.log("Error: Logo file is missing");
-      return res.status(400).json({ error: "Logo file is required" });
-    }
-
-    if (!email) {
-      console.log("Error: Email is missing");
-      return res.status(400).json({ error: "Email is required" });
-    }
-
-    const mime = req.file.mimetype;
-    console.log(`File type: ${mime}, size: ${req.file.size} bytes`);
-
-    // Upload logo to Cloudinary
-    console.log("Uploading logo to Cloudinary...");
-    const uploadResult = await cloudinaryConfig.uploadToCloudinary(
-      req.file.buffer,
-      req.file.originalname,
-      "logos"
-    );
-
-    logoUrl = uploadResult.secure_url;
-    console.log(`Logo uploaded to Cloudinary: ${logoUrl}`);
-
-    // Generate mockup using Cloudinary transformations
-    console.log("Generating mockup with Cloudinary...");
-    const mockupUrl = await cloudinaryConfig.generateMockupWithCloudinary(
-      logoUrl
-    );
-    console.log(`Mockup generated: ${mockupUrl}`);
-
-    // Process lead in ActiveCampaign
-    console.log("Processing lead in ActiveCampaign...");
-    try {
-      await activeCampaign.processLeadWithMockup(
-        { email, name, phone },
-        mockupUrl
-      );
-      console.log("Lead processed in ActiveCampaign successfully");
-    } catch (acError) {
-      console.error("Error processing lead in ActiveCampaign:", acError);
-      // Continue even if ActiveCampaign fails
-    }
-
-    // Return the result with WhatsApp redirect URL
-    const response = {
-      name,
-      email,
-      phone,
-      image: mockupUrl,
-      url: mockupUrl,
-      redirect_url: WHATSAPP_REDIRECT_URL,
-    };
-
-    console.log("Sending successful response");
-    res.json(response);
-  } catch (error) {
-    console.error("Error processing request with Cloudinary:", error);
-    console.error("Stack trace:", error.stack);
-    res.status(500).json({
-      error: "Failed to generate mockup with Cloudinary",
-      message: error.message,
-      stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
-    });
-  }
-});
-
-// Original API endpoint for mockup generation with ActiveCampaign integration
-app.post("/api/mockup", upload.single("logo"), async (req, res) => {
-  let logoPath = null;
-  let mockupPath = null;
-
-  try {
-    console.log("Received mockup generation request");
-    const { name, email, phone } = req.body;
-
-    console.log(`Request data: email=${email}, name=${name}`);
-
-    if (!req.file) {
-      console.log("Error: Logo file is missing");
-      return res.status(400).json({ error: "Logo file is required" });
-    }
-
-    if (!email) {
-      console.log("Error: Email is missing");
-      return res.status(400).json({ error: "Email is required" });
-    }
-
-    const mime = req.file.mimetype;
-    console.log(`File type: ${mime}, size: ${req.file.size} bytes`);
-
-    try {
-      // Create temp directory if it doesn't exist in Vercel environment
-      if (!fs.existsSync(tempDir)) {
-        console.log(`Creating temp directory: ${tempDir}`);
-        fs.mkdirSync(tempDir, { recursive: true });
-      }
-
-      if (mime === "application/pdf") {
-        // Convert PDF to PNG using CloudConvert
-        console.log("Converting PDF to PNG...");
-        logoPath = await pdfBufferToPng(req.file.buffer, req.file.originalname);
-      } else if (mime === "image/png" || mime === "image/jpeg") {
-        // Save the PNG/JPG temporarily
-        logoPath = path.join(
-          tempDir,
-          `logo-${Date.now()}-${req.file.originalname}`
-        );
-        fs.writeFileSync(logoPath, req.file.buffer);
-        console.log("Image saved to:", logoPath);
-      } else {
-        console.log(`Unsupported file format: ${mime}`);
-        return res.status(400).json({
-          error:
-            "Unsupported file format. Please upload a PDF, PNG, or JPG file.",
-        });
-      }
-
-      // Verify the logo file exists
-      if (!fs.existsSync(logoPath)) {
-        throw new Error(`Logo file not found at path: ${logoPath}`);
-      }
-
-      console.log("Generating mockup...");
-      // Generate mockup
-      mockupPath = await generateMockup(logoPath);
-      console.log(`Mockup generated at: ${mockupPath}`);
-
-      // Verify the mockup file exists
-      if (!fs.existsSync(mockupPath)) {
-        throw new Error(
-          `Generated mockup file not found at path: ${mockupPath}`
-        );
-      }
-
-      // Save to public directory or Supabase and get URL
-      console.log("Saving mockup and getting public URL...");
-      const publicUrl = await saveMockupToPublic(mockupPath, email);
-      console.log(`Public URL generated: ${publicUrl}`);
-
-      // Process lead in ActiveCampaign
-      console.log("Processing lead in ActiveCampaign...");
-      try {
-        await activeCampaign.processLeadWithMockup(
-          { email, name, phone },
-          publicUrl
-        );
-        console.log("Lead processed in ActiveCampaign successfully");
-      } catch (acError) {
-        console.error("Error processing lead in ActiveCampaign:", acError);
-        // Continue even if ActiveCampaign fails
-      }
-
-      // Read the mockup file for preview
-      console.log("Reading mockup file for preview...");
-      const mockupBuffer = fs.readFileSync(mockupPath);
-
-      // Convert to base64 for response
-      const b64 = mockupBuffer.toString("base64");
-      console.log("Mockup converted to base64");
-
-      // Return the result with WhatsApp redirect URL
-      const response = {
-        name,
-        email,
-        phone,
-        image: `data:image/png;base64,${b64}`,
-        url: publicUrl,
-        redirect_url: WHATSAPP_REDIRECT_URL,
-      };
-
-      console.log("Sending successful response");
-      res.json(response);
-    } finally {
-      // Clean up temporary files
-      setTimeout(() => {
-        try {
-          if (logoPath && fs.existsSync(logoPath)) {
-            fs.unlinkSync(logoPath);
-            console.log("Temporary logo file deleted:", logoPath);
-          }
-          if (mockupPath && fs.existsSync(mockupPath)) {
-            fs.unlinkSync(mockupPath);
-            console.log("Temporary mockup file deleted:", mockupPath);
-          }
-        } catch (cleanupError) {
-          console.error("Error cleaning up temporary files:", cleanupError);
-        }
-      }, 5000);
-    }
-  } catch (error) {
-    console.error("Error processing request:", error);
-    console.error("Stack trace:", error.stack);
-    res.status(500).json({
-      error: "Failed to generate mockup",
       message: error.message,
       stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
     });
