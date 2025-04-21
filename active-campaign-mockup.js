@@ -4,6 +4,7 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const dotenv = require("dotenv");
+const CloudConvert = require("cloudconvert");
 const https = require("https");
 const { v4: uuidv4 } = require("uuid");
 const activeCampaign = require("./active-campaign-api");
@@ -350,11 +351,55 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
     const mime = req.file.mimetype;
     console.log(`File type: ${mime}, size: ${req.file.size} bytes`);
 
+    let logoBuffer = req.file.buffer;
+    let logoFilename = req.file.originalname;
+
+    // If the file is a PDF, convert it to PNG using CloudConvert
+    if (mime === "application/pdf") {
+      console.log("Converting PDF to PNG using CloudConvert...");
+      try {
+        // Create temp directory if it doesn't exist
+        if (!fs.existsSync(tempDir)) {
+          console.log(`Creating temp directory: ${tempDir}`);
+          fs.mkdirSync(tempDir, { recursive: true });
+        }
+
+        // Save PDF temporarily
+        const pdfPath = path.join(tempDir, `pdf-${Date.now()}-${logoFilename}`);
+        fs.writeFileSync(pdfPath, logoBuffer);
+        console.log(`PDF saved temporarily to: ${pdfPath}`);
+
+        // Convert PDF to PNG
+        const pngPath = await pdfBufferToPng(logoBuffer, logoFilename);
+        console.log(`PDF converted to PNG: ${pngPath}`);
+
+        // Read the PNG file
+        logoBuffer = fs.readFileSync(pngPath);
+        logoFilename = logoFilename.replace(/\.pdf$/i, ".png");
+        console.log(`PNG loaded, size: ${logoBuffer.length} bytes`);
+
+        // Clean up temporary files
+        try {
+          fs.unlinkSync(pdfPath);
+          fs.unlinkSync(pngPath);
+          console.log("Temporary files cleaned up");
+        } catch (cleanupError) {
+          console.error("Error cleaning up temporary files:", cleanupError);
+        }
+      } catch (conversionError) {
+        console.error("Error converting PDF to PNG:", conversionError);
+        return res.status(500).json({
+          error: "Failed to convert PDF to PNG",
+          message: conversionError.message,
+        });
+      }
+    }
+
     // Upload logo to S3
     console.log("Uploading logo to S3...");
     const uploadResult = await s3Upload.uploadToS3(
-      req.file.buffer,
-      req.file.originalname,
+      logoBuffer,
+      logoFilename,
       "logos"
     );
 

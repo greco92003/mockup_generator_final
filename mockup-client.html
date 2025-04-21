@@ -190,7 +190,7 @@
     <div class="container">
       <h1>Mockup Generator</h1>
       <p class="description">
-        Upload your logo (PNG or JPG) and we'll generate a mockup for you
+        Upload your logo (PDF, PNG, or JPG) and we'll generate a mockup for you
       </p>
 
       <div class="content">
@@ -212,12 +212,12 @@
             </div>
 
             <div class="form-group">
-              <label for="logo">Logo (PNG, JPG)</label>
+              <label for="logo">Logo (PDF, PNG, JPG)</label>
               <input
                 type="file"
                 id="logo"
                 name="logo"
-                accept=".png,.jpg,.jpeg"
+                accept=".pdf,.png,.jpg,.jpeg"
                 required
               />
             </div>
@@ -269,9 +269,9 @@
             return;
           }
 
-          const allowedTypes = ["image/png", "image/jpeg"];
+          const allowedTypes = ["application/pdf", "image/png", "image/jpeg"];
           if (!allowedTypes.includes(logo.type)) {
-            showError("Please upload a PNG or JPG file");
+            showError("Please upload a PDF, PNG, or JPG file");
             return;
           }
 
