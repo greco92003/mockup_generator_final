@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.4",
+    "aws-sdk": "^2.1692.0",
     "axios": "^1.8.4",
     "cloudconvert": "^2.3.7",
     "cloudinary": "^2.6.0",
