@@ -329,8 +329,8 @@
           </div>
         </div>
 
-        <!-- Processamento feito exclusivamente pelo Cloudinary -->
-        <input type="hidden" name="processingMethod" value="cloudinary" />
+        <!-- Processamento feito pelo AWS Lambda -->
+        <input type="hidden" name="processingMethod" value="lambda" />
 
         <button type="submit" id="submitBtn">Gerar Mockup</button>
       </form>
@@ -442,9 +442,9 @@
           formData.append("logo", logoFile);
 
           try {
-            // Usando exclusivamente o endpoint do Cloudinary
-            const endpoint = "/api/mockup/cloudinary";
-            console.log(`Using endpoint: ${endpoint} (cloudinary)`);
+            // Usando o endpoint principal da API
+            const endpoint = "/api/mockup";
+            console.log(`Using endpoint: ${endpoint} (AWS Lambda)`);
 
             // Send request to server
             const response = await fetch(endpoint, {

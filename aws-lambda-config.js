@@ -35,6 +35,10 @@ async function generateMockupWithLambda(logoUrl, email, name) {
     }
 
     // Call the Lambda function via API Gateway
+    console.log("Calling Lambda function at:", LAMBDA_API_ENDPOINT);
+    console.log("With headers:", headers);
+    console.log("With payload:", { logoUrl, email, name });
+
     const response = await axios.post(
       LAMBDA_API_ENDPOINT,
       {
@@ -43,6 +47,12 @@ async function generateMockupWithLambda(logoUrl, email, name) {
         name,
       },
       { headers }
+    );
+
+    console.log("Lambda response status:", response.status);
+    console.log(
+      "Lambda response data:",
+      JSON.stringify(response.data, null, 2)
     );
 
     // Check if the request was successful
@@ -64,12 +74,38 @@ async function generateMockupWithLambda(logoUrl, email, name) {
       );
     }
 
+    // Check if the response contains a body field (API Gateway format)
+    if (response.data.body) {
+      try {
+        // Try to parse the body if it's a string
+        const bodyContent =
+          typeof response.data.body === "string"
+            ? JSON.parse(response.data.body)
+            : response.data.body;
+
+        // Check if there's an error message
+        if (bodyContent.message && bodyContent.message.includes("Error")) {
+          console.error("Lambda execution error:", bodyContent.message);
+          throw new Error(`Lambda execution error: ${bodyContent.message}`);
+        }
+
+        // If there's a mockupUrl in the body, use it
+        if (bodyContent.mockupUrl) {
+          return bodyContent.mockupUrl;
+        }
+      } catch (parseError) {
+        console.error("Error parsing Lambda response body:", parseError);
+      }
+    }
+
     // Extract the mockup URL from the response
     const mockupUrl = response.data.mockupUrl;
     if (!mockupUrl) {
       console.error("Invalid response from Lambda:", response.data);
       throw new Error(
-        "Invalid response from Lambda: mockupUrl not found in response"
+        "Invalid response from Lambda: mockupUrl not found in response. " +
+          "This could be due to permission issues with the AWS Lambda function. " +
+          "Please check the Lambda function's permissions and make sure it can access the S3 bucket."
       );
     }
 
