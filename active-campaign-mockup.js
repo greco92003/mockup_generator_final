@@ -34,8 +34,12 @@ app.use(express.json());
 // Define directories
 const publicDir = path.join(__dirname, "public");
 const mockupsDir = path.join(publicDir, "mockups");
-const tempDir = path.join(__dirname, "temp");
+// Use /tmp directory for serverless environments like Vercel
+const tempDir =
+  process.env.NODE_ENV === "production" ? "/tmp" : path.join(__dirname, "temp");
 const backgroundsDir = path.join(publicDir, "backgrounds");
+
+console.log(`Using temp directory: ${tempDir}`);
 
 // Function to ensure directories exist
 function ensureDirectoriesExist() {
@@ -128,7 +132,21 @@ async function pdfBufferToPng(buffer, filename = "logo.pdf") {
     const file = cloudConvert.jobs.getExportUrls(completed)[0];
     console.log("Download URL:", file.url);
 
+    // Ensure temp directory exists
+    try {
+      if (!fs.existsSync(tempDir)) {
+        console.log(`Creating temp directory: ${tempDir}`);
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
+    } catch (mkdirError) {
+      console.log(
+        `Note: Could not create temp directory: ${mkdirError.message}`
+      );
+      // Continue anyway, as /tmp should already exist in serverless environments
+    }
+
     const localPath = path.join(tempDir, file.filename);
+    console.log(`Downloading to: ${localPath}`);
 
     await new Promise((resolve, reject) => {
       const ws = fs.createWriteStream(localPath);
@@ -137,7 +155,10 @@ async function pdfBufferToPng(buffer, filename = "logo.pdf") {
         console.log("File downloaded to:", localPath);
         resolve();
       });
-      ws.on("error", reject);
+      ws.on("error", (err) => {
+        console.error("Error writing file:", err);
+        reject(err);
+      });
     });
 
     return localPath;
@@ -358,33 +379,45 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
     if (mime === "application/pdf") {
       console.log("Converting PDF to PNG using CloudConvert...");
       try {
-        // Create temp directory if it doesn't exist
+        // Ensure temp directory exists in serverless environments
         if (!fs.existsSync(tempDir)) {
-          console.log(`Creating temp directory: ${tempDir}`);
-          fs.mkdirSync(tempDir, { recursive: true });
+          try {
+            console.log(`Creating temp directory: ${tempDir}`);
+            fs.mkdirSync(tempDir, { recursive: true });
+          } catch (mkdirError) {
+            console.log(
+              `Could not create temp directory: ${mkdirError.message}`
+            );
+            // Continue anyway, as /tmp should already exist in serverless environments
+          }
         }
 
-        // Save PDF temporarily
-        const pdfPath = path.join(tempDir, `pdf-${Date.now()}-${logoFilename}`);
-        fs.writeFileSync(pdfPath, logoBuffer);
-        console.log(`PDF saved temporarily to: ${pdfPath}`);
-
-        // Convert PDF to PNG
+        // Convert PDF to PNG directly from buffer
+        console.log("Converting PDF buffer to PNG...");
         const pngPath = await pdfBufferToPng(logoBuffer, logoFilename);
         console.log(`PDF converted to PNG: ${pngPath}`);
 
         // Read the PNG file
-        logoBuffer = fs.readFileSync(pngPath);
-        logoFilename = logoFilename.replace(/\.pdf$/i, ".png");
-        console.log(`PNG loaded, size: ${logoBuffer.length} bytes`);
-
-        // Clean up temporary files
         try {
-          fs.unlinkSync(pdfPath);
-          fs.unlinkSync(pngPath);
-          console.log("Temporary files cleaned up");
-        } catch (cleanupError) {
-          console.error("Error cleaning up temporary files:", cleanupError);
+          logoBuffer = fs.readFileSync(pngPath);
+          logoFilename = logoFilename.replace(/\.pdf$/i, ".png");
+          console.log(`PNG loaded, size: ${logoBuffer.length} bytes`);
+
+          // Clean up temporary PNG file
+          try {
+            fs.unlinkSync(pngPath);
+            console.log("Temporary PNG file cleaned up");
+          } catch (cleanupError) {
+            console.error(
+              "Error cleaning up temporary PNG file:",
+              cleanupError
+            );
+          }
+        } catch (readError) {
+          console.error("Error reading PNG file:", readError);
+          throw new Error(
+            `Failed to read converted PNG file: ${readError.message}`
+          );
         }
       } catch (conversionError) {
         console.error("Error converting PDF to PNG:", conversionError);
