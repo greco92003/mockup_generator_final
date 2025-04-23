@@ -16,10 +16,19 @@ const s3Upload = require("./s3-upload");
 dotenv.config();
 
 // Initialize CloudConvert
-const cloudConvert = new CloudConvert(
-  process.env.CLOUDCONVERT_API_KEY || "",
-  false
+// Make sure we're passing just the API key without any prefix
+const cloudConvertApiKey = process.env.CLOUDCONVERT_API_KEY || "";
+console.log(
+  `CloudConvert API Key length: ${cloudConvertApiKey.length} characters`
 );
+// Check if the API key starts with "CLOUDCONVERT_API_KEY="
+const cleanApiKey = cloudConvertApiKey.startsWith("CLOUDCONVERT_API_KEY=")
+  ? cloudConvertApiKey.substring("CLOUDCONVERT_API_KEY=".length)
+  : cloudConvertApiKey;
+
+const cloudConvert = new CloudConvert(cleanApiKey, false);
+
+console.log("CloudConvert client initialized");
 
 // WhatsApp redirect URL
 const WHATSAPP_REDIRECT_URL =
@@ -89,79 +98,122 @@ const upload = multer({ storage: multer.memoryStorage() });
 async function pdfBufferToPng(buffer, filename = "logo.pdf") {
   try {
     console.log("Starting PDF to PNG conversion with CloudConvert...");
+    console.log(`API Key length: ${cleanApiKey.length} characters`);
 
     // Create job (upload + convert + export)
-    const job = await cloudConvert.jobs.create({
-      tasks: {
-        upload_logo: {
-          operation: "import/upload",
-        },
-        convert_logo: {
-          operation: "convert",
-          input: "upload_logo",
-          output_format: "png",
-          density: 300, // Pixel Density: 300 DPI for better quality
-          alpha: true, // Alpha: Yes - Render pages with an alpha channel and transparent background
-          filename: filename.replace(/\.pdf$/i, ".png"),
-        },
-        export_logo: {
-          operation: "export/url",
-          input: "convert_logo",
-        },
-      },
-    });
-
-    console.log("Job created:", job.id);
-
-    // Upload the file
-    const uploadTask = job.tasks.find((t) => t.name === "upload_logo");
-    await cloudConvert.tasks.upload(
-      uploadTask,
-      buffer,
-      filename,
-      buffer.length
-    );
-    console.log("File uploaded to CloudConvert");
-
-    // Wait for completion
-    console.log("Waiting for conversion to complete...");
-    const completed = await cloudConvert.jobs.wait(job.id);
-    console.log("Conversion completed");
-
-    // Download the generated PNG
-    const file = cloudConvert.jobs.getExportUrls(completed)[0];
-    console.log("Download URL:", file.url);
-
-    // Ensure temp directory exists
+    console.log("Creating CloudConvert job with tasks...");
+    let job;
     try {
-      if (!fs.existsSync(tempDir)) {
-        console.log(`Creating temp directory: ${tempDir}`);
-        fs.mkdirSync(tempDir, { recursive: true });
+      job = await cloudConvert.jobs.create({
+        tasks: {
+          upload_logo: {
+            operation: "import/upload",
+          },
+          convert_logo: {
+            operation: "convert",
+            input: "upload_logo",
+            output_format: "png",
+            density: 300, // Pixel Density: 300 DPI for better quality
+            alpha: true, // Alpha: Yes - Render pages with an alpha channel and transparent background
+            filename: filename.replace(/\.pdf$/i, ".png"),
+          },
+          export_logo: {
+            operation: "export/url",
+            input: "convert_logo",
+          },
+        },
+      });
+      console.log("CloudConvert job created successfully:", job.id);
+    } catch (error) {
+      console.error("Error creating CloudConvert job:", error);
+      if (error.response && error.response.data) {
+        console.error(
+          "API Error Response:",
+          JSON.stringify(error.response.data, null, 2)
+        );
       }
-    } catch (mkdirError) {
-      console.log(
-        `Note: Could not create temp directory: ${mkdirError.message}`
-      );
-      // Continue anyway, as /tmp should already exist in serverless environments
+      throw error;
     }
 
-    const localPath = path.join(tempDir, file.filename);
-    console.log(`Downloading to: ${localPath}`);
+    // Upload the file
+    try {
+      const uploadTask = job.tasks.find((t) => t.name === "upload_logo");
+      console.log("Upload task:", uploadTask ? uploadTask.id : "Not found");
 
-    await new Promise((resolve, reject) => {
-      const ws = fs.createWriteStream(localPath);
-      https.get(file.url, (response) => response.pipe(ws));
-      ws.on("finish", () => {
-        console.log("File downloaded to:", localPath);
-        resolve();
-      });
-      ws.on("error", (err) => {
-        console.error("Error writing file:", err);
-        reject(err);
-      });
-    });
+      await cloudConvert.tasks.upload(
+        uploadTask,
+        buffer,
+        filename,
+        buffer.length
+      );
+      console.log("File uploaded to CloudConvert");
+    } catch (uploadError) {
+      console.error("Error uploading file to CloudConvert:", uploadError);
+      if (uploadError.response && uploadError.response.data) {
+        console.error(
+          "API Error Response:",
+          JSON.stringify(uploadError.response.data, null, 2)
+        );
+      }
+      throw uploadError;
+    }
 
-    return localPath;
+    // Wait for completion
+    let completed;
+    try {
+      console.log("Waiting for conversion to complete...");
+      completed = await cloudConvert.jobs.wait(job.id);
+      console.log("Conversion completed");
+    } catch (waitError) {
+      console.error("Error waiting for CloudConvert job:", waitError);
+      if (waitError.response && waitError.response.data) {
+        console.error(
+          "API Error Response:",
+          JSON.stringify(waitError.response.data, null, 2)
+        );
+      }
+      throw waitError;
+    }
+
+    // Download the generated PNG
+    try {
+      const file = cloudConvert.jobs.getExportUrls(completed)[0];
+      console.log("Download URL:", file.url);
+
+      // Ensure temp directory exists
+      try {
+        if (!fs.existsSync(tempDir)) {
+          console.log(`Creating temp directory: ${tempDir}`);
+          fs.mkdirSync(tempDir, { recursive: true });
+        }
+      } catch (mkdirError) {
+        console.log(
+          `Note: Could not create temp directory: ${mkdirError.message}`
+        );
+        // Continue anyway, as /tmp should already exist in serverless environments
+      }
+
+      const localPath = path.join(tempDir, file.filename);
+      console.log(`Downloading to: ${localPath}`);
+
+      await new Promise((resolve, reject) => {
+        const ws = fs.createWriteStream(localPath);
+        https.get(file.url, (response) => response.pipe(ws));
+        ws.on("finish", () => {
+          console.log("File downloaded to:", localPath);
+          resolve();
+        });
+        ws.on("error", (err) => {
+          console.error("Error writing file:", err);
+          reject(err);
+        });
+      });
+
+      return localPath;
+    } catch (downloadError) {
+      console.error("Error downloading converted file:", downloadError);
+      throw downloadError;
+    }
   } catch (error) {
     console.error("Error converting PDF to PNG:", error);
     throw error;
