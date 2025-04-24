@@ -62,22 +62,20 @@ async function processQueue() {
 }
 
 /**
- * Process lead in ActiveCampaign asynchronously
- * @param {Object} leadData - Lead data (email, name, phone)
- * @param {string} mockupUrl - URL of the mockup
+ * Process basic lead information in ActiveCampaign asynchronously
+ * @param {Object} leadData - Lead data (email, name, phone, segmento)
  */
-async function processLeadAsync(leadData, mockupUrl) {
+async function processLeadBasicInfoAsync(leadData) {
   console.log(
-    "Adicionando tarefa de processamento de lead à fila assíncrona..."
+    "Adicionando tarefa de processamento de dados básicos do lead à fila assíncrona..."
   );
   console.log("Dados do lead:", JSON.stringify(leadData));
-  console.log("URL do mockup:", mockupUrl);
 
   addTask(
     async (data) => {
-      const { leadData, mockupUrl } = data;
+      const { leadData } = data;
       console.log(
-        "Iniciando processamento assíncrono do lead no ActiveCampaign..."
+        "Iniciando processamento assíncrono dos dados básicos do lead no ActiveCampaign..."
       );
       console.log(
         "Dados do lead para processamento:",
@@ -85,20 +83,89 @@ async function processLeadAsync(leadData, mockupUrl) {
       );
 
       try {
-        console.log("Chamando API do ActiveCampaign...");
-        await activeCampaign.processLeadWithMockup(leadData, mockupUrl);
-        console.log("Lead processado com sucesso no ActiveCampaign");
+        console.log(
+          "Chamando API do ActiveCampaign para processar dados básicos..."
+        );
+        await activeCampaign.processLeadBasicInfo(leadData);
+        console.log(
+          "Dados básicos do lead processados com sucesso no ActiveCampaign"
+        );
       } catch (acError) {
-        console.error("Erro ao processar lead no ActiveCampaign:", acError);
+        console.error(
+          "Erro ao processar dados básicos do lead no ActiveCampaign:",
+          acError
+        );
         console.error("Stack trace:", acError.stack);
         // We don't rethrow the error since this is async processing
       }
     },
-    { leadData, mockupUrl }
+    { leadData }
   );
+}
+
+/**
+ * Update mockup URL for a contact in ActiveCampaign asynchronously
+ * @param {string} email - Email of the contact
+ * @param {string} mockupUrl - URL of the mockup
+ */
+async function updateMockupUrlAsync(email, mockupUrl) {
+  console.log(
+    "Adicionando tarefa de atualização de URL do mockup à fila assíncrona..."
+  );
+  console.log("Email:", email);
+  console.log("URL do mockup:", mockupUrl);
+
+  addTask(
+    async (data) => {
+      const { email, mockupUrl } = data;
+      console.log(
+        "Iniciando atualização assíncrona do URL do mockup no ActiveCampaign..."
+      );
+
+      try {
+        console.log(
+          "Chamando API do ActiveCampaign para atualizar URL do mockup..."
+        );
+        await activeCampaign.updateLeadMockupUrl(email, mockupUrl);
+        console.log("URL do mockup atualizado com sucesso no ActiveCampaign");
+      } catch (acError) {
+        console.error(
+          "Erro ao atualizar URL do mockup no ActiveCampaign:",
+          acError
+        );
+        console.error("Stack trace:", acError.stack);
+        // We don't rethrow the error since this is async processing
+      }
+    },
+    { email, mockupUrl }
+  );
+}
+
+/**
+ * Process lead in ActiveCampaign asynchronously (legacy function for backward compatibility)
+ * @param {Object} leadData - Lead data (email, name, phone)
+ * @param {string} mockupUrl - URL of the mockup
+ */
+async function processLeadAsync(leadData, mockupUrl) {
+  console.log(
+    "Usando função legada processLeadAsync. Processando dados básicos primeiro..."
+  );
+
+  // Process basic info first
+  await processLeadBasicInfoAsync(leadData);
+
+  // Then update mockup URL if available
+  if (mockupUrl) {
+    console.log("Atualizando URL do mockup...");
+    await updateMockupUrlAsync(leadData.email, mockupUrl);
+  } else {
+    console.log("URL do mockup não fornecido, pulando atualização");
+  }
 }
 
 module.exports = {
   processLeadAsync,
+  processLeadBasicInfoAsync,
+  updateMockupUrlAsync,
   addTask,
 };

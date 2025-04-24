@@ -371,18 +371,16 @@ async function findOrCreateList(listName) {
 }
 
 /**
- * Process a lead for mockup generation
- * @param {object} leadData - Lead data
- * @param {string} mockupUrl - URL of the generated mockup
- * @returns {Promise<object>} - Result of the operation
+ * Process basic lead information (without mockup URL)
+ * @param {object} leadData - Lead data (email, name, phone, segmento)
+ * @returns {Promise<object>} - Result of the operation with contact information
  */
-async function processLeadWithMockup(leadData, mockupUrl) {
+async function processLeadBasicInfo(leadData) {
   try {
     console.log(
-      "Iniciando processamento do lead no ActiveCampaign com dados:",
+      "Iniciando processamento dos dados básicos do lead no ActiveCampaign:",
       JSON.stringify(leadData)
     );
-    console.log("Mockup URL:", mockupUrl);
 
     const { email, name, phone, segmento } = leadData;
 
@@ -430,18 +428,6 @@ async function processLeadWithMockup(leadData, mockupUrl) {
       console.log(`Novo contato criado com ID: ${contact.id}`);
     }
 
-    // Find or create mockup_url custom field
-    console.log("Buscando ou criando campo personalizado mockup_url...");
-    const mockupField = await createOrUpdateCustomField("mockup_url");
-    console.log(`Campo mockup_url encontrado/criado com ID: ${mockupField.id}`);
-
-    // Update custom field with mockup URL
-    console.log(
-      `Atualizando campo mockup_url para contato ${contact.id} com valor: ${mockupUrl}`
-    );
-    await updateContactCustomField(contact.id, mockupField.id, mockupUrl);
-    console.log("Campo mockup_url atualizado com sucesso");
-
     // Process segmento field if provided
     if (segmento) {
       console.log(`Processando campo segmento com valor: ${segmento}`);
@@ -484,8 +470,87 @@ async function processLeadWithMockup(leadData, mockupUrl) {
     return {
       success: true,
       contact,
+    };
+  } catch (error) {
+    console.error("Erro ao processar dados básicos do lead:", error);
+    throw error;
+  }
+}
+
+/**
+ * Update mockup URL for an existing contact
+ * @param {string} email - Email of the contact
+ * @param {string} mockupUrl - URL of the generated mockup
+ * @returns {Promise<object>} - Result of the operation
+ */
+async function updateLeadMockupUrl(email, mockupUrl) {
+  try {
+    console.log(`Atualizando URL do mockup para o contato com email: ${email}`);
+    console.log("Mockup URL:", mockupUrl);
+
+    // Verificar se temos todos os dados necessários
+    if (!email) {
+      console.error("Email não fornecido para atualização do mockup URL");
+      throw new Error("Email é obrigatório para atualização do mockup URL");
+    }
+
+    if (!mockupUrl) {
+      console.error("URL do mockup não fornecido");
+      throw new Error("URL do mockup é obrigatório");
+    }
+
+    // Find contact
+    console.log(`Buscando contato com email: ${email}`);
+    const contact = await findContactByEmail(email);
+
+    if (!contact) {
+      console.error(`Contato com email ${email} não encontrado`);
+      throw new Error(`Contato com email ${email} não encontrado`);
+    }
+
+    console.log(`Contato encontrado com ID: ${contact.id}`);
+
+    // Find or create mockup_url custom field
+    console.log("Buscando ou criando campo personalizado mockup_url...");
+    const mockupField = await createOrUpdateCustomField("mockup_url");
+    console.log(`Campo mockup_url encontrado/criado com ID: ${mockupField.id}`);
+
+    // Update custom field with mockup URL
+    console.log(
+      `Atualizando campo mockup_url para contato ${contact.id} com valor: ${mockupUrl}`
+    );
+    await updateContactCustomField(contact.id, mockupField.id, mockupUrl);
+    console.log("Campo mockup_url atualizado com sucesso");
+
+    return {
+      success: true,
+      contact,
       mockupUrl,
     };
+  } catch (error) {
+    console.error("Erro ao atualizar URL do mockup:", error);
+    throw error;
+  }
+}
+
+/**
+ * Process a lead for mockup generation (legacy function for backward compatibility)
+ * @param {object} leadData - Lead data
+ * @param {string} mockupUrl - URL of the generated mockup
+ * @returns {Promise<object>} - Result of the operation
+ */
+async function processLeadWithMockup(leadData, mockupUrl) {
+  try {
+    console.log(
+      "Usando função legada processLeadWithMockup. Processando dados básicos primeiro..."
+    );
+
+    // Process basic info first
+    const basicResult = await processLeadBasicInfo(leadData);
+
+    // Then update mockup URL
+    console.log("Atualizando URL do mockup...");
+    return await updateLeadMockupUrl(leadData.email, mockupUrl);
   } catch (error) {
     console.error("Error processing lead with mockup:", error);
     throw error;
@@ -503,4 +568,6 @@ module.exports = {
   getLists,
   findOrCreateList,
   processLeadWithMockup,
+  processLeadBasicInfo,
+  updateLeadMockupUrl,
 };

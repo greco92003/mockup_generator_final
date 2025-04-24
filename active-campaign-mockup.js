@@ -455,6 +455,10 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
       return res.status(400).json({ error: "Email is required" });
     }
 
+    // Process basic lead information immediately
+    console.log("Processing basic lead information immediately...");
+    asyncProcessor.processLeadBasicInfoAsync({ email, name, phone, segmento });
+
     const mime = req.file.mimetype;
     console.log(`File type: ${mime}, size: ${req.file.size} bytes`);
 
@@ -587,12 +591,9 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
       console.log(`Total processing time: ${totalTime}ms`);
     }
 
-    // Process lead in ActiveCampaign asynchronously
-    console.log("Processing lead in ActiveCampaign asynchronously...");
-    asyncProcessor.processLeadAsync(
-      { email, name, phone, segmento },
-      mockupUrl
-    );
+    // Update mockup URL in ActiveCampaign asynchronously
+    console.log("Updating mockup URL in ActiveCampaign asynchronously...");
+    asyncProcessor.updateMockupUrlAsync(email, mockupUrl);
 
     // Return the result with WhatsApp redirect URL
     const response = {
