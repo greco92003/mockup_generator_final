@@ -226,29 +226,137 @@ async function createOrUpdateCustomField(fieldLabel, fieldType = "TEXT") {
  */
 async function updateContactCustomField(contactId, fieldId, fieldValue) {
   try {
-    const response = await fetch(`${AC_API_URL}/api/3/fieldValues`, {
-      method: "POST",
-      headers: {
-        "Api-Token": AC_API_KEY,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({
+    console.log(
+      `Atualizando campo personalizado ${fieldId} para contato ${contactId} com valor: ${fieldValue}`
+    );
+
+    // First, check if the field value already exists for this contact
+    console.log(
+      "Verificando se o valor de campo já existe para este contato..."
+    );
+    const checkResponse = await fetch(
+      `${AC_API_URL}/api/3/contacts/${contactId}/fieldValues`,
+      {
+        method: "GET",
+        headers: {
+          "Api-Token": AC_API_KEY,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+      }
+    );
+
+    const checkData = await checkResponse.json();
+    let existingFieldValueId = null;
+
+    if (checkData.fieldValues) {
+      const existingFieldValue = checkData.fieldValues.find(
+        (fv) => parseInt(fv.field) === parseInt(fieldId)
+      );
+
+      if (existingFieldValue) {
+        existingFieldValueId = existingFieldValue.id;
+        console.log(
+          `Valor de campo existente encontrado com ID: ${existingFieldValueId}`
+        );
+      }
+    }
+
+    let response;
+    let method;
+    let url;
+    let body;
+
+    if (existingFieldValueId) {
+      // Update existing field value
+      method = "PUT";
+      url = `${AC_API_URL}/api/3/fieldValues/${existingFieldValueId}`;
+      body = JSON.stringify({
+        fieldValue: {
+          value: fieldValue,
+        },
+      });
+      console.log(
+        `Atualizando valor de campo existente com ID: ${existingFieldValueId}`
+      );
+    } else {
+      // Create new field value
+      method = "POST";
+      url = `${AC_API_URL}/api/3/fieldValues`;
+      body = JSON.stringify({
         fieldValue: {
           contact: contactId,
           field: fieldId,
           value: fieldValue,
         },
-      }),
+      });
+      console.log("Criando novo valor de campo");
+    }
+
+    // Make the request
+    response = await fetch(url, {
+      method,
+      headers: {
+        "Api-Token": AC_API_KEY,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body,
     });
 
     const data = await response.json();
 
     if (data.fieldValue) {
       console.log(
-        `Custom field value updated for contact ${contactId}, field ${fieldId}`
+        `Valor de campo ${
+          existingFieldValueId ? "atualizado" : "criado"
+        } com sucesso para contato ${contactId}, campo ${fieldId}`
       );
       return data.fieldValue;
+    }
+
+    // If the update failed, try a direct approach
+    if (!data.fieldValue) {
+      console.warn(
+        "Falha na atualização do campo. Tentando abordagem alternativa..."
+      );
+
+      // Try a direct approach using the contacts endpoint
+      const directResponse = await fetch(
+        `${AC_API_URL}/api/3/contacts/${contactId}`,
+        {
+          method: "PUT",
+          headers: {
+            "Api-Token": AC_API_KEY,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({
+            contact: {
+              fieldValues: [
+                {
+                  field: fieldId,
+                  value: fieldValue,
+                },
+              ],
+            },
+          }),
+        }
+      );
+
+      const directData = await directResponse.json();
+
+      if (directData.contact) {
+        console.log(
+          "Campo atualizado com sucesso usando abordagem alternativa"
+        );
+        return { field: fieldId, value: fieldValue };
+      }
+
+      console.error(
+        "Falha na atualização do campo usando abordagem alternativa:",
+        directData
+      );
     }
 
     throw new Error(
@@ -576,19 +684,59 @@ async function updateLeadMockupUrl(email, mockupUrl) {
       console.log("Continuando com as informações conhecidas do campo...");
     }
 
-    // Update custom field with mockup URL
+    // Update custom field with mockup URL using multiple approaches
     console.log(
       `Atualizando campo "${mockupField.title}" (ID: ${mockupField.id}) para contato ${contact.id} com valor: ${mockupUrl}`
     );
-    const updatedField = await updateContactCustomField(
-      contact.id,
-      mockupField.id,
-      mockupUrl
-    );
-    console.log(
-      `Campo "${mockupField.title}" atualizado com sucesso:`,
-      JSON.stringify(updatedField)
-    );
+
+    // Try the standard approach first
+    try {
+      console.log("Tentando atualizar campo usando abordagem padrão...");
+      const updatedField = await updateContactCustomField(
+        contact.id,
+        mockupField.id,
+        mockupUrl
+      );
+      console.log(
+        `Campo "${mockupField.title}" atualizado com sucesso (abordagem padrão):`,
+        JSON.stringify(updatedField)
+      );
+    } catch (updateError) {
+      console.error("Erro na atualização padrão:", updateError);
+
+      // Try a direct API call as a fallback
+      try {
+        console.log("Tentando atualização direta via API...");
+        const directResponse = await fetch(`${AC_API_URL}/api/3/fieldValues`, {
+          method: "POST",
+          headers: {
+            "Api-Token": AC_API_KEY,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({
+            fieldValue: {
+              contact: contact.id,
+              field: 41, // Hardcoded ID for mockup_url
+              value: mockupUrl,
+            },
+          }),
+        });
+
+        const directData = await directResponse.json();
+
+        if (directData.fieldValue) {
+          console.log(
+            "Campo atualizado com sucesso via API direta:",
+            directData.fieldValue
+          );
+        } else {
+          console.error("Falha na atualização direta:", directData);
+        }
+      } catch (directError) {
+        console.error("Erro na atualização direta:", directError);
+      }
+    }
 
     // Verify the field was updated correctly
     try {
@@ -689,7 +837,7 @@ async function processLeadWithMockup(leadData, mockupUrl) {
     );
 
     // Process basic info first
-    const basicResult = await processLeadBasicInfo(leadData);
+    await processLeadBasicInfo(leadData);
 
     // Then update mockup URL
     console.log("Atualizando URL do mockup...");
