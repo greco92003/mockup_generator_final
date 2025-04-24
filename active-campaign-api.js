@@ -530,53 +530,51 @@ async function updateLeadMockupUrl(email, mockupUrl) {
 
     console.log(`Contato encontrado com ID: ${contact.id}`);
 
-    // Find or create mockup_url custom field using multiple variations
-    console.log("Buscando campo personalizado para mockup URL...");
+    // Use the known field ID directly (ID: 41, Título: mockup_url, Tipo: text)
+    console.log("Usando ID conhecido do campo mockup_url (ID: 41)...");
 
-    // Try different variations of the field name
-    const fieldVariations = [
-      "MOCKUPURL",
-      "mockup_url",
-      "mockupurl",
-      "Mockup URL",
-      "mockup url",
-      "MOCKUP_URL",
-      "Mockup Url",
-    ];
+    // Create a mockupField object with the known information
+    const mockupField = {
+      id: 41,
+      title: "mockup_url",
+      type: "text",
+    };
 
-    // Log the variations we're trying
-    console.log(
-      "Tentando as seguintes variações de nome de campo:",
-      fieldVariations.join(", ")
-    );
+    console.log(`Usando campo mockup_url com ID: ${mockupField.id}`);
 
-    // Try to find the field using each variation
-    let mockupField = null;
-    for (const fieldName of fieldVariations) {
-      console.log(`Tentando encontrar campo com nome: "${fieldName}"`);
-      try {
-        const field = await createOrUpdateCustomField(fieldName);
-        if (field) {
-          mockupField = field;
-          console.log(
-            `Campo encontrado com nome "${fieldName}", ID: ${field.id}`
-          );
-          break;
+    // As a fallback, verify if the field exists
+    try {
+      console.log("Verificando se o campo existe...");
+      const response = await fetch(
+        `${AC_API_URL}/api/3/fields/${mockupField.id}`,
+        {
+          method: "GET",
+          headers: {
+            "Api-Token": AC_API_KEY,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
         }
-      } catch (fieldError) {
-        console.log(`Erro ao buscar campo "${fieldName}":`, fieldError.message);
+      );
+
+      const data = await response.json();
+
+      if (data.field) {
+        console.log(
+          `Campo verificado: ID: ${data.field.id}, Título: ${data.field.title}, Tipo: ${data.field.type}`
+        );
+        // Update our mockupField object with the actual data
+        mockupField.title = data.field.title;
+        mockupField.type = data.field.type;
+      } else {
+        console.warn(
+          `Campo com ID ${mockupField.id} não encontrado. Usando informações padrão.`
+        );
       }
+    } catch (verifyError) {
+      console.error("Erro ao verificar campo:", verifyError);
+      console.log("Continuando com as informações conhecidas do campo...");
     }
-
-    // If we still couldn't find the field, try creating it with the primary name
-    if (!mockupField) {
-      console.log("Nenhum campo encontrado, criando novo campo MOCKUPURL...");
-      mockupField = await createOrUpdateCustomField("MOCKUPURL");
-    }
-
-    console.log(
-      `Campo para mockup URL encontrado/criado com ID: ${mockupField.id}, Título: ${mockupField.title}`
-    );
 
     // Update custom field with mockup URL
     console.log(
@@ -610,17 +608,55 @@ async function updateLeadMockupUrl(email, mockupUrl) {
       const data = await response.json();
 
       if (data.fieldValues) {
-        const fieldValue = data.fieldValues.find(
-          (fv) => fv.field === mockupField.id
+        console.log(
+          `Encontrados ${data.fieldValues.length} valores de campo para o contato ${contact.id}`
         );
+
+        // Log all field values for debugging
+        data.fieldValues.forEach((fv) => {
+          console.log(`- Campo ID: ${fv.field}, Valor: ${fv.value}`);
+        });
+
+        // Find our specific field
+        const fieldValue = data.fieldValues.find(
+          (fv) => parseInt(fv.field) === parseInt(mockupField.id)
+        );
+
         if (fieldValue) {
           console.log(
-            `Valor atual do campo "${mockupField.title}": ${fieldValue.value}`
+            `Valor atual do campo "${mockupField.title}" (ID: ${mockupField.id}): ${fieldValue.value}`
           );
+
+          // Check if the value matches what we set
+          if (fieldValue.value === mockupUrl) {
+            console.log(
+              "✅ Campo atualizado com sucesso! O valor corresponde ao URL do mockup."
+            );
+          } else {
+            console.warn(
+              "⚠️ Campo atualizado, mas o valor não corresponde exatamente ao URL do mockup."
+            );
+            console.log("Valor esperado:", mockupUrl);
+            console.log("Valor atual:", fieldValue.value);
+          }
         } else {
-          console.log(
-            `Campo "${mockupField.title}" não encontrado nos valores do contato`
+          console.warn(
+            `⚠️ Campo "${mockupField.title}" (ID: ${mockupField.id}) não encontrado nos valores do contato`
           );
+
+          // Try to find any field that might contain the mockup URL
+          const possibleField = data.fieldValues.find(
+            (fv) =>
+              fv.value &&
+              fv.value.includes("mockup") &&
+              fv.value.includes(".png")
+          );
+
+          if (possibleField) {
+            console.log(
+              `Encontrado possível campo com URL do mockup: Campo ID: ${possibleField.field}, Valor: ${possibleField.value}`
+            );
+          }
         }
       } else {
         console.log("Nenhum valor de campo encontrado para o contato");
