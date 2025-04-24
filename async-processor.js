@@ -109,6 +109,14 @@ async function processLeadBasicInfoAsync(leadData) {
  * @param {string} mockupUrl - URL of the mockup
  */
 async function updateMockupUrlAsync(email, mockupUrl) {
+  // Verificar se o mockupUrl está definido
+  if (!mockupUrl) {
+    console.error(
+      "updateMockupUrlAsync: mockupUrl está indefinido, não adicionando à fila"
+    );
+    return;
+  }
+
   console.log(
     "Adicionando tarefa de atualização de URL do mockup à fila assíncrona..."
   );
@@ -118,6 +126,15 @@ async function updateMockupUrlAsync(email, mockupUrl) {
   addTask(
     async (data) => {
       const { email, mockupUrl } = data;
+
+      // Verificação adicional dentro da tarefa
+      if (!mockupUrl) {
+        console.error(
+          "Tarefa de atualização: mockupUrl está indefinido, pulando processamento"
+        );
+        return;
+      }
+
       console.log(
         "Iniciando atualização assíncrona do URL do mockup no ActiveCampaign..."
       );

@@ -572,7 +572,7 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
 
       // Generate mockup using AWS Lambda
       console.log("Generating mockup with AWS Lambda...");
-      const mockupUrl = await awsLambdaConfig.generateMockupWithLambda(
+      mockupUrl = await awsLambdaConfig.generateMockupWithLambda(
         logoUrl,
         email,
         name
@@ -591,9 +591,14 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
       console.log(`Total processing time: ${totalTime}ms`);
     }
 
-    // Update mockup URL in ActiveCampaign asynchronously
-    console.log("Updating mockup URL in ActiveCampaign asynchronously...");
-    asyncProcessor.updateMockupUrlAsync(email, mockupUrl);
+    // Update mockup URL in ActiveCampaign asynchronously if available
+    if (mockupUrl) {
+      console.log("Updating mockup URL in ActiveCampaign asynchronously...");
+      console.log("Mockup URL to update:", mockupUrl);
+      asyncProcessor.updateMockupUrlAsync(email, mockupUrl);
+    } else {
+      console.log("Mockup URL is undefined, skipping ActiveCampaign update");
+    }
 
     // Return the result with WhatsApp redirect URL
     const response = {
