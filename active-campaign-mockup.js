@@ -12,6 +12,12 @@ const supabaseStorage = require("./supabase-storage");
 const awsLambdaConfig = require("./aws-lambda-config");
 const s3Upload = require("./s3-upload");
 
+// Import optimized modules
+const PdfConverter = require("./optimized-pdf-converter");
+const CacheManager = require("./cache-manager");
+const ParallelProcessor = require("./parallel-processor");
+const MockupCache = require("./mockup-cache");
+
 // Load environment variables
 dotenv.config();
 
@@ -30,6 +36,37 @@ const cloudConvert = new CloudConvert(cleanApiKey, false);
 
 console.log("CloudConvert client initialized");
 
+// Define directories
+const publicDir = path.join(__dirname, "public");
+const mockupsDir = path.join(publicDir, "mockups");
+// Use /tmp directory for serverless environments like Vercel
+const tempDir =
+  process.env.NODE_ENV === "production" ? "/tmp" : path.join(__dirname, "temp");
+const backgroundsDir = path.join(publicDir, "backgrounds");
+
+console.log(`Using temp directory: ${tempDir}`);
+
+// Define cache directories
+const pdfCacheDir =
+  process.env.NODE_ENV === "production"
+    ? "/tmp/pdf-cache"
+    : path.join(__dirname, "cache/pdf");
+const mockupCacheDir =
+  process.env.NODE_ENV === "production"
+    ? "/tmp/mockup-cache"
+    : path.join(__dirname, "cache/mockup");
+
+// Initialize optimized modules
+const pdfConverter = new PdfConverter(cleanApiKey, tempDir, pdfCacheDir);
+const mockupCache = new MockupCache(mockupCacheDir);
+
+// Clean expired cache entries on startup
+try {
+  mockupCache.cleanExpired();
+} catch (error) {
+  console.error("Error cleaning mockup cache:", error);
+}
+
 // WhatsApp redirect URL
 const WHATSAPP_REDIRECT_URL =
   process.env.WHATSAPP_REDIRECT_URL ||
@@ -40,15 +77,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Define directories
-const publicDir = path.join(__dirname, "public");
-const mockupsDir = path.join(publicDir, "mockups");
-// Use /tmp directory for serverless environments like Vercel
-const tempDir =
-  process.env.NODE_ENV === "production" ? "/tmp" : path.join(__dirname, "temp");
-const backgroundsDir = path.join(publicDir, "backgrounds");
-
-console.log(`Using temp directory: ${tempDir}`);
+// These directories are already defined above
 
 // Function to ensure directories exist
 function ensureDirectoriesExist() {
@@ -427,27 +456,36 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
     let logoBuffer = req.file.buffer;
     let logoFilename = req.file.originalname;
 
-    // If the file is a PDF, convert it to PNG using CloudConvert
+    // If the file is a PDF, convert it to PNG using optimized converter with caching
     if (mime === "application/pdf") {
-      console.log("Converting PDF to PNG using CloudConvert...");
+      console.log(
+        "Converting PDF to PNG using optimized converter with caching..."
+      );
       try {
-        // Ensure temp directory exists in serverless environments
-        if (!fs.existsSync(tempDir)) {
-          try {
-            console.log(`Creating temp directory: ${tempDir}`);
-            fs.mkdirSync(tempDir, { recursive: true });
-          } catch (mkdirError) {
-            console.log(
-              `Could not create temp directory: ${mkdirError.message}`
-            );
-            // Continue anyway, as /tmp should already exist in serverless environments
-          }
-        }
+        // Generate cache key for logging
+        const cacheKey = CacheManager.prototype.generateKey(
+          logoBuffer,
+          logoFilename.replace(/\.pdf$/i, ".png")
+        );
+        console.log(`Cache key: ${cacheKey}`);
 
-        // Convert PDF to PNG directly from buffer
+        // Start conversion timer
+        const conversionStartTime = Date.now();
+
+        // Convert PDF to PNG using optimized converter with caching
         console.log("Converting PDF buffer to PNG...");
-        const pngPath = await pdfBufferToPng(logoBuffer, logoFilename);
-        console.log(`PDF converted to PNG: ${pngPath}`);
+        const pngPath = await pdfConverter.convertPdfToPng(
+          logoBuffer,
+          logoFilename
+        );
+
+        // Log conversion time
+        const conversionTime = Date.now() - conversionStartTime;
+        console.log(`PDF converted to PNG in ${conversionTime}ms: ${pngPath}`);
+
+        // Log cache statistics
+        const cacheStats = pdfConverter.getCacheStats();
+        console.log(`Cache statistics: ${JSON.stringify(cacheStats)}`);
 
         // Read the PNG file
         try {
@@ -455,15 +493,17 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
           logoFilename = logoFilename.replace(/\.pdf$/i, ".png");
           console.log(`PNG loaded, size: ${logoBuffer.length} bytes`);
 
-          // Clean up temporary PNG file
-          try {
-            fs.unlinkSync(pngPath);
-            console.log("Temporary PNG file cleaned up");
-          } catch (cleanupError) {
-            console.error(
-              "Error cleaning up temporary PNG file:",
-              cleanupError
-            );
+          // We don't delete the file if it came from cache
+          if (!pngPath.includes(pdfCacheDir)) {
+            try {
+              fs.unlinkSync(pngPath);
+              console.log("Temporary PNG file cleaned up");
+            } catch (cleanupError) {
+              console.error(
+                "Error cleaning up temporary PNG file:",
+                cleanupError
+              );
+            }
           }
         } catch (readError) {
           console.error("Error reading PNG file:", readError);
@@ -480,25 +520,67 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
       }
     }
 
-    // Upload logo to S3
-    console.log("Uploading logo to S3...");
-    const uploadResult = await s3Upload.uploadToS3(
-      logoBuffer,
-      logoFilename,
-      "logos"
+    // Check if we have a cached mockup for this request
+    const mockupCacheKey = mockupCache.generateKey(
+      req.file.buffer.toString("base64").substring(0, 1000), // Use first 1000 chars of base64 for faster hashing
+      name,
+      email
     );
+    console.log(`Mockup cache key: ${mockupCacheKey}`);
 
-    logoUrl = uploadResult.url;
-    console.log(`Logo uploaded to S3: ${logoUrl}`);
+    // Check mockup cache
+    const cachedMockup = mockupCache.get(mockupCacheKey);
+    let mockupUrl;
 
-    // Generate mockup using AWS Lambda
-    console.log("Generating mockup with AWS Lambda...");
-    const mockupUrl = await awsLambdaConfig.generateMockupWithLambda(
-      logoUrl,
-      email,
-      name
-    );
-    console.log(`Mockup generated with AWS Lambda: ${mockupUrl}`);
+    if (cachedMockup) {
+      console.log(`Using cached mockup: ${cachedMockup.url}`);
+      logoUrl = cachedMockup.logoUrl;
+      mockupUrl = cachedMockup.url;
+      console.log(`Cached mockup URL: ${mockupUrl}`);
+
+      // Log cache statistics
+      const cacheStats = mockupCache.getStats();
+      console.log(`Mockup cache statistics: ${JSON.stringify(cacheStats)}`);
+    } else {
+      // Start timer for performance measurement
+      const startTime = Date.now();
+
+      // Use parallel processing for S3 upload and mockup generation
+      console.log("Starting parallel processing...");
+
+      // Upload logo to S3
+      console.log("Uploading logo to S3...");
+      const uploadPromise = s3Upload.uploadToS3(
+        logoBuffer,
+        logoFilename,
+        "logos"
+      );
+
+      // Start upload and continue with other processing
+      const uploadResult = await uploadPromise;
+      logoUrl = uploadResult.url;
+      console.log(`Logo uploaded to S3: ${logoUrl}`);
+
+      // Generate mockup using AWS Lambda
+      console.log("Generating mockup with AWS Lambda...");
+      const mockupUrl = await awsLambdaConfig.generateMockupWithLambda(
+        logoUrl,
+        email,
+        name
+      );
+      console.log(`Mockup generated with AWS Lambda: ${mockupUrl}`);
+
+      // Store in mockup cache
+      mockupCache.store(mockupCacheKey, {
+        logoUrl,
+        url: mockupUrl,
+        timestamp: Date.now(),
+      });
+
+      // Log total processing time
+      const totalTime = Date.now() - startTime;
+      console.log(`Total processing time: ${totalTime}ms`);
+    }
 
     // Process lead in ActiveCampaign
     console.log("Processing lead in ActiveCampaign...");
