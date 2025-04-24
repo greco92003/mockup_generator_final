@@ -848,6 +848,108 @@ async function processLeadWithMockup(leadData, mockupUrl) {
   }
 }
 
+/**
+ * Get all field values for a contact
+ * @param {number} contactId - Contact ID
+ * @returns {Promise<Array>} - Field values
+ */
+async function getContactFieldValues(contactId) {
+  try {
+    console.log(`Buscando valores de campo para contato ${contactId}...`);
+    const response = await fetch(
+      `${AC_API_URL}/api/3/contacts/${contactId}/fieldValues`,
+      {
+        method: "GET",
+        headers: {
+          "Api-Token": AC_API_KEY,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+      }
+    );
+
+    const data = await response.json();
+
+    if (data.fieldValues) {
+      console.log(`Encontrados ${data.fieldValues.length} valores de campo`);
+
+      // Get field details for each field value
+      const fieldDetails = [];
+
+      for (const fieldValue of data.fieldValues) {
+        try {
+          const fieldResponse = await fetch(
+            `${AC_API_URL}/api/3/fields/${fieldValue.field}`,
+            {
+              method: "GET",
+              headers: {
+                "Api-Token": AC_API_KEY,
+                "Content-Type": "application/json",
+                Accept: "application/json",
+              },
+            }
+          );
+
+          const fieldData = await fieldResponse.json();
+
+          if (fieldData.field) {
+            fieldDetails.push({
+              id: fieldValue.field,
+              title: fieldData.field.title,
+              type: fieldData.field.type,
+              value: fieldValue.value,
+              fieldValueId: fieldValue.id,
+            });
+          } else {
+            fieldDetails.push({
+              id: fieldValue.field,
+              title: "Unknown",
+              type: "Unknown",
+              value: fieldValue.value,
+              fieldValueId: fieldValue.id,
+            });
+          }
+        } catch (fieldError) {
+          console.error(
+            `Erro ao buscar detalhes do campo ${fieldValue.field}:`,
+            fieldError
+          );
+          fieldDetails.push({
+            id: fieldValue.field,
+            title: "Error",
+            type: "Error",
+            value: fieldValue.value,
+            fieldValueId: fieldValue.id,
+            error: fieldError.message,
+          });
+        }
+      }
+
+      // Check specifically for mockup_url field (ID: 41)
+      const mockupUrlField = fieldDetails.find(
+        (field) => parseInt(field.id) === 41
+      );
+
+      if (mockupUrlField) {
+        console.log(
+          `Campo mockup_url encontrado: ID: ${mockupUrlField.id}, Valor: ${mockupUrlField.value}`
+        );
+      } else {
+        console.log(
+          "Campo mockup_url (ID: 41) não encontrado para este contato"
+        );
+      }
+
+      return fieldDetails;
+    }
+
+    return [];
+  } catch (error) {
+    console.error("Error getting contact field values:", error);
+    throw error;
+  }
+}
+
 module.exports = {
   findContactByEmail,
   createContact,
@@ -861,4 +963,5 @@ module.exports = {
   processLeadWithMockup,
   processLeadBasicInfo,
   updateLeadMockupUrl,
+  getContactFieldValues,
 };

@@ -635,6 +635,54 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
   }
 });
 
+// Endpoint to check contact fields in ActiveCampaign
+app.get("/api/check-contact-fields", async (req, res) => {
+  try {
+    const { email } = req.query;
+
+    if (!email) {
+      return res.status(400).json({
+        error: "Missing required parameter",
+        message: "Email is required",
+      });
+    }
+
+    console.log(`Verificando campos do contato com email: ${email}`);
+
+    // Find contact in ActiveCampaign
+    const contact = await activeCampaign.findContactByEmail(email);
+
+    if (!contact) {
+      return res.status(404).json({
+        error: "Contact not found",
+        message: `No contact found with email: ${email}`,
+      });
+    }
+
+    console.log(`Contato encontrado com ID: ${contact.id}`);
+
+    // Get all field values for the contact
+    const fieldValues = await activeCampaign.getContactFieldValues(contact.id);
+
+    return res.json({
+      success: true,
+      contact: {
+        id: contact.id,
+        email: contact.email,
+        firstName: contact.firstName,
+        lastName: contact.lastName,
+      },
+      fieldValues,
+    });
+  } catch (error) {
+    console.error("Error checking contact fields:", error);
+    return res.status(500).json({
+      error: "Failed to check contact fields",
+      message: error.message,
+    });
+  }
+});
+
 // Endpoint to manually update mockup URL for a contact
 app.post("/api/update-mockup-url", async (req, res) => {
   try {
@@ -662,6 +710,95 @@ app.post("/api/update-mockup-url", async (req, res) => {
     console.error("Error updating mockup URL:", error);
     return res.status(500).json({
       error: "Failed to update mockup URL",
+      message: error.message,
+    });
+  }
+});
+
+// Endpoint to directly update the mockup_url field (ID: 41)
+app.post("/api/update-mockup-field-direct", async (req, res) => {
+  try {
+    const { email, mockupUrl } = req.body;
+
+    if (!email || !mockupUrl) {
+      return res.status(400).json({
+        error: "Missing required parameters",
+        message: "Both email and mockupUrl are required",
+      });
+    }
+
+    console.log(
+      `Atualização direta do campo mockup_url para ${email}: ${mockupUrl}`
+    );
+
+    // Find contact in ActiveCampaign
+    const contact = await activeCampaign.findContactByEmail(email);
+
+    if (!contact) {
+      return res.status(404).json({
+        error: "Contact not found",
+        message: `No contact found with email: ${email}`,
+      });
+    }
+
+    console.log(`Contato encontrado com ID: ${contact.id}`);
+
+    // Make a direct API call to update the field
+    const response = await fetch(
+      `${process.env.ACTIVE_CAMPAIGN_URL}/api/3/fieldValues`,
+      {
+        method: "POST",
+        headers: {
+          "Api-Token": process.env.ACTIVE_CAMPAIGN_API_KEY,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          fieldValue: {
+            contact: contact.id,
+            field: 41, // Hardcoded ID for mockup_url
+            value: mockupUrl,
+          },
+        }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (data.fieldValue) {
+      console.log(
+        "Campo mockup_url atualizado com sucesso via API direta:",
+        data.fieldValue
+      );
+
+      // Verify the update
+      const fieldValues = await activeCampaign.getContactFieldValues(
+        contact.id
+      );
+      const mockupUrlField = fieldValues.find(
+        (field) => parseInt(field.id) === 41
+      );
+
+      return res.json({
+        success: true,
+        message: `Campo mockup_url atualizado com sucesso para ${email}`,
+        email,
+        mockupUrl,
+        fieldValue: data.fieldValue,
+        verification: mockupUrlField,
+      });
+    } else {
+      console.error("Falha na atualização direta:", data);
+      return res.status(500).json({
+        error: "Failed to update mockup_url field",
+        message: "API call was successful but no fieldValue was returned",
+        apiResponse: data,
+      });
+    }
+  } catch (error) {
+    console.error("Error updating mockup_url field directly:", error);
+    return res.status(500).json({
+      error: "Failed to update mockup_url field",
       message: error.message,
     });
   }
