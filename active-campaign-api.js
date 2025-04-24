@@ -154,12 +154,32 @@ async function createOrUpdateCustomField(fieldLabel, fieldType = "TEXT") {
     const data = await response.json();
 
     if (data.fields) {
-      const existingField = data.fields.find(
-        (field) => field.title.toLowerCase() === fieldLabel.toLowerCase()
+      // Log all fields for debugging
+      console.log(
+        `Campos personalizados disponíveis no ActiveCampaign (${data.fields.length}):`
+      );
+      data.fields.forEach((field) => {
+        console.log(
+          `- ID: ${field.id}, Título: ${field.title}, Tipo: ${field.type}`
+        );
+      });
+
+      // Try to find the field by exact match first
+      let existingField = data.fields.find(
+        (field) => field.title === fieldLabel
       );
 
+      // If not found, try case-insensitive match
+      if (!existingField) {
+        existingField = data.fields.find(
+          (field) => field.title.toLowerCase() === fieldLabel.toLowerCase()
+        );
+      }
+
       if (existingField) {
-        console.log(`Custom field already exists: ${existingField.id}`);
+        console.log(
+          `Custom field already exists: ${existingField.id}, Title: ${existingField.title}`
+        );
         return existingField;
       }
     }
@@ -511,16 +531,16 @@ async function updateLeadMockupUrl(email, mockupUrl) {
     console.log(`Contato encontrado com ID: ${contact.id}`);
 
     // Find or create mockup_url custom field
-    console.log("Buscando ou criando campo personalizado mockup_url...");
-    const mockupField = await createOrUpdateCustomField("mockup_url");
-    console.log(`Campo mockup_url encontrado/criado com ID: ${mockupField.id}`);
+    console.log("Buscando ou criando campo personalizado MOCKUPURL...");
+    const mockupField = await createOrUpdateCustomField("MOCKUPURL");
+    console.log(`Campo MOCKUPURL encontrado/criado com ID: ${mockupField.id}`);
 
     // Update custom field with mockup URL
     console.log(
-      `Atualizando campo mockup_url para contato ${contact.id} com valor: ${mockupUrl}`
+      `Atualizando campo MOCKUPURL para contato ${contact.id} com valor: ${mockupUrl}`
     );
     await updateContactCustomField(contact.id, mockupField.id, mockupUrl);
-    console.log("Campo mockup_url atualizado com sucesso");
+    console.log("Campo MOCKUPURL atualizado com sucesso");
 
     return {
       success: true,
