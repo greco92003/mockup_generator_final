@@ -371,7 +371,7 @@ async function findOrCreateList(listName) {
  */
 async function processLeadWithMockup(leadData, mockupUrl) {
   try {
-    const { email, name, phone } = leadData;
+    const { email, name, phone, segmento } = leadData;
 
     // Split name into first and last name
     let firstName = name;
@@ -409,6 +409,19 @@ async function processLeadWithMockup(leadData, mockupUrl) {
 
     // Update custom field with mockup URL
     await updateContactCustomField(contact.id, mockupField.id, mockupUrl);
+
+    // Process segmento field if provided
+    if (segmento) {
+      console.log(`Processing segmento field: ${segmento}`);
+      // Find or create segmento custom field
+      const segmentoField = await createOrUpdateCustomField(
+        "Segmento de Negócio",
+        "DROPDOWN"
+      );
+
+      // Update custom field with segmento value
+      await updateContactCustomField(contact.id, segmentoField.id, segmento);
+    }
 
     // Find or create list for mockup leads
     const mockupList = await findOrCreateList("Mockup Leads");

@@ -437,9 +437,13 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
 
   try {
     console.log("Received mockup generation request (AWS Lambda)");
-    const { name, email, phone } = req.body;
+    const { name, email, phone, segmento } = req.body;
 
-    console.log(`Request data: email=${email}, name=${name}`);
+    console.log(
+      `Request data: email=${email}, name=${name}, segmento=${
+        segmento || "não informado"
+      }`
+    );
 
     if (!req.file) {
       console.log("Error: Logo file is missing");
@@ -585,7 +589,10 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
 
     // Process lead in ActiveCampaign asynchronously
     console.log("Processing lead in ActiveCampaign asynchronously...");
-    asyncProcessor.processLeadAsync({ email, name, phone }, mockupUrl);
+    asyncProcessor.processLeadAsync(
+      { email, name, phone, segmento },
+      mockupUrl
+    );
 
     // Return the result with WhatsApp redirect URL
     const response = {

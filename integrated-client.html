@@ -3,16 +3,31 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Gerador de Mockups - HUD LAB</title>
+    <meta
+      name="description"
+      content="Formulário para solicitação de mockup personalizado de chinelos - HUD LAB"
+    />
+    <meta name="robots" content="noindex" />
+    <title>Formulário de Solicitação - HUD LAB</title>
     <style>
       body {
         font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
         line-height: 1.6;
         color: #333;
-        max-width: 800px;
+        max-width: 100%;
         margin: 0 auto;
-        padding: 20px;
-        background-color: #f5f5f5;
+        padding: 0;
+        background-color: transparent;
+        overflow-x: hidden;
+      }
+
+      /* Container para o formulário */
+      .main-container {
+        width: 100%;
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 10px;
+        box-sizing: border-box;
       }
 
       h1 {
@@ -41,7 +56,8 @@
 
       input[type="text"],
       input[type="email"],
-      input[type="tel"] {
+      input[type="tel"],
+      select {
         width: 100%;
         padding: 12px;
         border: 1px solid #ddd;
@@ -52,7 +68,8 @@
 
       input[type="text"]:focus,
       input[type="email"]:focus,
-      input[type="tel"]:focus {
+      input[type="tel"]:focus,
+      select:focus {
         border-color: #3498db;
         outline: none;
         box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
@@ -93,7 +110,7 @@
       }
 
       button {
-        background-color: #3498db;
+        background-color: #0dc220;
         color: white;
         border: none;
         padding: 14px 20px;
@@ -106,7 +123,7 @@
       }
 
       button:hover {
-        background-color: #2980b9;
+        background-color: #0aa51b;
       }
 
       .result-container {
@@ -244,127 +261,150 @@
     </style>
   </head>
   <body>
-    <h1>Gerador de Mockups - HUD LAB</h1>
-
-    <div class="info-box">
-      <p>
-        Faça upload do seu logo para gerar um mockup personalizado de chinelos.
-        Após o envio, você será redirecionado para o WhatsApp para continuar o
-        atendimento.
-      </p>
-      <p><strong>Formatos aceitos:</strong> PNG, JPG (recomendado) ou PDF.</p>
-    </div>
-
-    <div class="form-container">
-      <form id="mockupForm">
-        <div class="form-group">
-          <label for="name">Nome Completo:</label>
-          <input
-            type="text"
-            id="name"
-            name="name"
-            placeholder="Seu nome completo"
-            required
-          />
-        </div>
-
-        <div class="form-group">
-          <label for="email">Email:</label>
-          <input
-            type="email"
-            id="email"
-            name="email"
-            placeholder="seu.email@exemplo.com"
-            required
-          />
-          <div class="error-message" id="emailError">
-            Por favor, insira um email válido.
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label for="phone">WhatsApp (com DDD):</label>
-          <input
-            type="tel"
-            id="phone"
-            name="phone"
-            placeholder="11999999999"
-            required
-          />
-          <div class="error-message" id="phoneError">
-            Por favor, insira um número válido com DDD.
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label for="logo">Logo:</label>
-          <div class="file-input-container">
-            <label for="logo" class="file-input-label">Escolher arquivo</label>
+    <div class="main-container">
+      <div class="form-container">
+        <form id="mockupForm">
+          <div class="form-group">
+            <label for="name">Nome Completo:</label>
             <input
-              type="file"
-              id="logo"
-              name="logo"
-              accept=".png,.jpg,.jpeg,.pdf"
-              class="file-input"
+              type="text"
+              id="name"
+              name="name"
+              placeholder="Seu nome completo"
               required
             />
-            <div class="file-name" id="fileName">
-              Nenhum arquivo selecionado
+          </div>
+
+          <div class="form-group">
+            <label for="email">Email:</label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              placeholder="seu.email@exemplo.com"
+              required
+            />
+            <div class="error-message" id="emailError">
+              Por favor, insira um email válido.
             </div>
           </div>
-          <div class="error-message" id="logoError">
-            Por favor, selecione um arquivo PNG, JPG ou PDF.
+
+          <div class="form-group">
+            <label for="phone">WhatsApp (com DDD):</label>
+            <input
+              type="tel"
+              id="phone"
+              name="phone"
+              placeholder="11999999999"
+              required
+            />
+            <div class="error-message" id="phoneError">
+              Por favor, insira um número válido com DDD.
+            </div>
           </div>
-          <div class="logo-requirements">
-            <p>Requisitos para o logo:</p>
-            <ul>
-              <li>
-                Tamanho máximo para chinelos: 163px de largura, 100px de altura
-              </li>
-              <li>
-                Tamanho máximo para etiquetas: 64px de largura, 60px de altura
-              </li>
-              <li>Preferencialmente com fundo transparente</li>
-            </ul>
+
+          <div class="form-group">
+            <label for="segmento">Segmento de Negócio*</label>
+            <select id="segmento" name="segmento" required>
+              <option value="">Selecione uma opção</option>
+              <option value="Marca de Roupa">Marca de Roupa</option>
+              <option value="Marca de Calçado">Marca de Calçado</option>
+              <option value="Time de Futebol ou Outro Esporte">
+                Time de Futebol ou Outro Esporte
+              </option>
+              <option value="Atlética Universitária">
+                Atlética Universitária
+              </option>
+              <option value="Marca de Cosméticos e Estética">
+                Marca de Cosméticos e Estética
+              </option>
+              <option value="Igreja ou Instituição Religiosa">
+                Igreja ou Instituição Religiosa
+              </option>
+              <option value="Empresa em Geral">Empresa em Geral</option>
+              <option value="Negócio Local">Negócio Local</option>
+              <option value="Academia/Crossfit/Grupo de Corrida">
+                Academia/Crossfit/Grupo de Corrida
+              </option>
+              <option value="Agência de Marketing">Agência de Marketing</option>
+              <option value="Produtora de Eventos">Produtora de Eventos</option>
+              <option value="Outro">Outro</option>
+            </select>
           </div>
-        </div>
 
-        <!-- Processamento feito pelo AWS Lambda -->
-        <input type="hidden" name="processingMethod" value="lambda" />
+          <div class="form-group">
+            <label for="logo">Logo:</label>
+            <p style="margin-top: 5px; margin-bottom: 10px; font-size: 14px">
+              Faça upload do seu logo para gerar um mockup personalizado de
+              chinelos.
+            </p>
+            <p style="margin-top: 0; margin-bottom: 15px; font-size: 14px">
+              Formatos aceitos: JPG de alta qualidade, PNG sem fundo de alta
+              qualidade ou PDF vetorizado (recomendado).
+            </p>
+            <div class="file-input-container">
+              <label for="logo" class="file-input-label"
+                >Escolher arquivo</label
+              >
+              <input
+                type="file"
+                id="logo"
+                name="logo"
+                accept=".png,.jpg,.jpeg,.pdf"
+                class="file-input"
+                required
+              />
+              <div class="file-name" id="fileName">
+                Nenhum arquivo selecionado
+              </div>
+            </div>
+            <div class="error-message" id="logoError">
+              Por favor, selecione um arquivo PNG, JPG ou PDF.
+            </div>
+          </div>
 
-        <button type="submit" id="submitBtn">Gerar Mockup</button>
-      </form>
-    </div>
+          <!-- Processamento feito pelo AWS Lambda -->
+          <input type="hidden" name="processingMethod" value="lambda" />
 
-    <div class="loading" id="loading">
-      <div class="loading-spinner"></div>
-      <p>Gerando seu mockup, aguarde um momento...</p>
-    </div>
-
-    <div class="result-container" id="resultContainer">
-      <h2>Seu Mockup</h2>
-      <img id="mockupImage" class="mockup-image" alt="Mockup gerado" />
-
-      <div class="success-message" id="successMessage">
-        <p>Mockup gerado com sucesso!</p>
-        <a
-          href="#"
-          id="downloadLink"
-          class="download-link"
-          download="mockup.png"
-          >Baixar Mockup</a
-        >
+          <button type="submit" id="submitBtn">Enviar</button>
+        </form>
       </div>
 
-      <div class="redirect-message" id="redirectMessage">
-        <p>
-          Você será redirecionado para o WhatsApp em
-          <span id="countdown" class="countdown">5</span> segundos...
-        </p>
-        <p>Ou clique no botão abaixo para continuar:</p>
-        <a href="#" id="whatsappButton" class="whatsapp-button" target="_blank">
-          <span class="whatsapp-icon">📱</span> Continuar no WhatsApp
-        </a>
+      <div class="loading" id="loading">
+        <div class="loading-spinner"></div>
+        <p>Gerando seu mockup, aguarde um momento...</p>
+      </div>
+
+      <div class="result-container" id="resultContainer">
+        <h2>Seu Mockup</h2>
+        <img id="mockupImage" class="mockup-image" alt="Mockup gerado" />
+
+        <div class="success-message" id="successMessage">
+          <p>Mockup gerado com sucesso!</p>
+          <a
+            href="#"
+            id="downloadLink"
+            class="download-link"
+            download="mockup.png"
+            >Baixar Mockup</a
+          >
+        </div>
+
+        <div class="redirect-message" id="redirectMessage">
+          <p>
+            Você será redirecionado para o WhatsApp em
+            <span id="countdown" class="countdown">5</span> segundos...
+          </p>
+          <p>Ou clique no botão abaixo para continuar:</p>
+          <a
+            href="#"
+            id="whatsappButton"
+            class="whatsapp-button"
+            target="_blank"
+          >
+            <span class="whatsapp-icon">📱</span> Continuar no WhatsApp
+          </a>
+        </div>
       </div>
     </div>
 
@@ -446,6 +486,12 @@
             const endpoint = "/api/mockup";
             console.log(`Using endpoint: ${endpoint} (AWS Lambda)`);
 
+            // Adicionar o segmento de negócio ao formData
+            formData.append(
+              "segmento",
+              document.getElementById("segmento").value
+            );
+
             // Send request to server
             const response = await fetch(endpoint, {
               method: "POST",
@@ -453,33 +499,15 @@
             });
 
             if (!response.ok) {
-              throw new Error("Failed to generate mockup");
+              throw new Error("Failed to process request");
             }
 
-            const data = await response.json();
+            // Redirecionar imediatamente para a página de agradecimento
+            window.location.href =
+              "https://hudlab.com.br/obrigado-amostra-digital2";
 
-            // Display result
-            mockupImage.src = data.image;
-            downloadLink.href = data.url;
-            whatsappButton.href = data.redirect_url;
-
-            // Show result container
-            loading.style.display = "none";
-            resultContainer.style.display = "block";
-            successMessage.style.display = "block";
-            redirectMessage.style.display = "block";
-
-            // Start countdown for WhatsApp redirect
-            let secondsLeft = 5;
-            const countdownInterval = setInterval(() => {
-              secondsLeft--;
-              countdown.textContent = secondsLeft;
-
-              if (secondsLeft <= 0) {
-                clearInterval(countdownInterval);
-                window.location.href = data.redirect_url;
-              }
-            }, 1000);
+            // Não precisamos esperar pela resposta completa, pois já estamos redirecionando
+            // O processamento continuará no backend
 
             // Reset form
             form.reset();
