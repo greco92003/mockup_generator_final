@@ -588,6 +588,84 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
             url: mockupUrl,
             timestamp: Date.now(),
           });
+
+          // Update mockup URL in ActiveCampaign synchronously
+          console.log(
+            "Atualizando URL do mockup no ActiveCampaign de forma síncrona..."
+          );
+          try {
+            // Find contact in ActiveCampaign
+            const contact = await activeCampaign.findContactByEmail(email);
+
+            if (contact) {
+              console.log(`Contato encontrado com ID: ${contact.id}`);
+
+              // Update the mockup_url field directly using the API
+              const response = await fetch(
+                `${process.env.ACTIVE_CAMPAIGN_URL}/api/3/fieldValues`,
+                {
+                  method: "POST",
+                  headers: {
+                    "Api-Token": process.env.ACTIVE_CAMPAIGN_API_KEY,
+                    "Content-Type": "application/json",
+                    Accept: "application/json",
+                  },
+                  body: JSON.stringify({
+                    fieldValue: {
+                      contact: contact.id,
+                      field: 41, // ID for mockup_url
+                      value: mockupUrl,
+                    },
+                  }),
+                }
+              );
+
+              const data = await response.json();
+
+              if (data.fieldValue) {
+                console.log(
+                  "Campo mockup_url atualizado com sucesso:",
+                  data.fieldValue
+                );
+
+                // Verify the update
+                const fieldValues = await activeCampaign.getContactFieldValues(
+                  contact.id
+                );
+                const mockupUrlField = fieldValues.find(
+                  (field) => parseInt(field.id) === 41
+                );
+
+                if (mockupUrlField && mockupUrlField.value === mockupUrl) {
+                  console.log(
+                    "✅ Verificação confirmou que o campo mockup_url foi atualizado corretamente"
+                  );
+                } else {
+                  console.warn(
+                    "⚠️ Verificação não encontrou o valor esperado no campo mockup_url"
+                  );
+                  if (mockupUrlField) {
+                    console.log("Valor atual:", mockupUrlField.value);
+                    console.log("Valor esperado:", mockupUrl);
+                  }
+                }
+              } else {
+                console.error(
+                  "Falha na atualização do campo mockup_url:",
+                  data
+                );
+              }
+            } else {
+              console.warn(
+                `Contato com email ${email} não encontrado no ActiveCampaign`
+              );
+            }
+          } catch (acError) {
+            console.error(
+              "Erro ao atualizar campo mockup_url no ActiveCampaign:",
+              acError
+            );
+          }
         } else {
           console.warn("No mockup URL returned from Lambda, using fallback...");
           mockupUrl = awsLambdaConfig.generateFallbackMockupUrl(email);
