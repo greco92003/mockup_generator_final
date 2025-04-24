@@ -370,55 +370,12 @@
         </form>
       </div>
 
-      <div class="loading" id="loading">
-        <div class="loading-spinner"></div>
-        <p>Gerando seu mockup, aguarde um momento...</p>
-      </div>
-
-      <div class="result-container" id="resultContainer">
-        <h2>Seu Mockup</h2>
-        <img id="mockupImage" class="mockup-image" alt="Mockup gerado" />
-
-        <div class="success-message" id="successMessage">
-          <p>Mockup gerado com sucesso!</p>
-          <a
-            href="#"
-            id="downloadLink"
-            class="download-link"
-            download="mockup.png"
-            >Baixar Mockup</a
-          >
-        </div>
-
-        <div class="redirect-message" id="redirectMessage">
-          <p>
-            Você será redirecionado para o WhatsApp em
-            <span id="countdown" class="countdown">5</span> segundos...
-          </p>
-          <p>Ou clique no botão abaixo para continuar:</p>
-          <a
-            href="#"
-            id="whatsappButton"
-            class="whatsapp-button"
-            target="_blank"
-          >
-            <span class="whatsapp-icon">📱</span> Continuar no WhatsApp
-          </a>
-        </div>
-      </div>
+      <!-- Elementos de loading e resultado removidos, pois agora redirecionamos imediatamente -->
     </div>
 
     <script>
       document.addEventListener("DOMContentLoaded", function () {
         const form = document.getElementById("mockupForm");
-        const loading = document.getElementById("loading");
-        const resultContainer = document.getElementById("resultContainer");
-        const mockupImage = document.getElementById("mockupImage");
-        const downloadLink = document.getElementById("downloadLink");
-        const successMessage = document.getElementById("successMessage");
-        const redirectMessage = document.getElementById("redirectMessage");
-        const whatsappButton = document.getElementById("whatsappButton");
-        const countdown = document.getElementById("countdown");
         const emailError = document.getElementById("emailError");
         const phoneError = document.getElementById("phoneError");
         const logoError = document.getElementById("logoError");
@@ -470,55 +427,89 @@
             return;
           }
 
-          // Show loading
-          loading.style.display = "block";
-          resultContainer.style.display = "none";
-
           // Create form data
           const formData = new FormData();
           formData.append("name", document.getElementById("name").value);
           formData.append("email", email);
           formData.append("phone", phone);
           formData.append("logo", logoFile);
+          formData.append(
+            "segmento",
+            document.getElementById("segmento").value
+          );
 
+          // Armazenar os dados do formulário em localStorage para envio após redirecionamento
           try {
-            // Usando o endpoint principal da API
-            const endpoint = "/api/mockup";
-            console.log(`Using endpoint: ${endpoint} (AWS Lambda)`);
+            // Não podemos armazenar o arquivo diretamente no localStorage, então vamos apenas salvar os outros dados
+            const formDataToStore = {
+              name: document.getElementById("name").value,
+              email: email,
+              phone: phone,
+              segmento: document.getElementById("segmento").value,
+              timestamp: Date.now(),
+            };
 
-            // Adicionar o segmento de negócio ao formData
-            formData.append(
-              "segmento",
-              document.getElementById("segmento").value
+            // Salvar no localStorage
+            localStorage.setItem(
+              "pendingFormData",
+              JSON.stringify(formDataToStore)
             );
 
-            // Send request to server
-            const response = await fetch(endpoint, {
-              method: "POST",
-              body: formData,
-            });
-
-            if (!response.ok) {
-              throw new Error("Failed to process request");
-            }
+            // Criar um blob com o arquivo para upload
+            const fileBlob = new Blob([logoFile], { type: logoFile.type });
 
             // Redirecionar imediatamente para a página de agradecimento
+            console.log("Redirecionando para página de agradecimento...");
+
+            // Iniciar o upload em segundo plano usando sendBeacon se disponível
+            const endpoint = "/api/mockup";
+
+            if (navigator.sendBeacon) {
+              console.log("Usando sendBeacon para envio em segundo plano");
+              // Infelizmente sendBeacon não suporta FormData com arquivos, então vamos usar fetch
+              // mas não vamos esperar pela resposta
+              fetch(endpoint, {
+                method: "POST",
+                body: formData,
+                // Configurar para não esperar pela resposta
+                keepalive: true,
+              }).catch((err) => {
+                console.log(
+                  "Erro no envio em segundo plano, mas o usuário já foi redirecionado:",
+                  err
+                );
+              });
+            } else {
+              console.log("sendBeacon não disponível, usando fetch");
+              // Iniciar o fetch mas não esperar pela resposta
+              fetch(endpoint, {
+                method: "POST",
+                body: formData,
+                keepalive: true,
+              }).catch((err) => {
+                console.log(
+                  "Erro no envio em segundo plano, mas o usuário já foi redirecionado:",
+                  err
+                );
+              });
+            }
+
+            // Redirecionar imediatamente, sem esperar pelo fetch
             window.location.href =
               "https://hudlab.com.br/obrigado-amostra-digital2";
-
-            // Não precisamos esperar pela resposta completa, pois já estamos redirecionando
-            // O processamento continuará no backend
-
-            // Reset form
-            form.reset();
-            fileName.textContent = "Nenhum arquivo selecionado";
           } catch (error) {
-            console.error("Error:", error);
+            console.error("Erro ao processar o formulário:", error);
             alert(
-              "Ocorreu um erro ao gerar o mockup. Por favor, tente novamente."
+              "Ocorreu um erro ao processar o formulário. Por favor, tente novamente."
             );
-            loading.style.display = "none";
+
+            // Mostrar o erro mas não bloquear o usuário
+            // Redirecionar mesmo em caso de erro
+            window.location.href =
+              "https://hudlab.com.br/obrigado-amostra-digital2";
           }
+          // Este catch não é mais necessário, pois já temos um catch interno
+          // que lida com os erros e redireciona o usuário
         });
       });
     </script>

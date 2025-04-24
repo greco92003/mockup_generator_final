@@ -11,6 +11,13 @@ const AC_API_KEY =
   process.env.ACTIVE_CAMPAIGN_API_KEY ||
   "4a5918adee94f39f5e9393e6e215b01fbe5122c26afb2c57250e2bd51806b94823e0efe5";
 
+// Log API configuration for debugging
+console.log("ActiveCampaign API URL:", AC_API_URL);
+console.log(
+  "ActiveCampaign API Key (primeiros 10 caracteres):",
+  AC_API_KEY.substring(0, 10) + "..."
+);
+
 /**
  * Find a contact in ActiveCampaign by email
  * @param {string} email - Email to search for
@@ -371,7 +378,21 @@ async function findOrCreateList(listName) {
  */
 async function processLeadWithMockup(leadData, mockupUrl) {
   try {
+    console.log(
+      "Iniciando processamento do lead no ActiveCampaign com dados:",
+      JSON.stringify(leadData)
+    );
+    console.log("Mockup URL:", mockupUrl);
+
     const { email, name, phone, segmento } = leadData;
+
+    // Verificar se temos todos os dados necessários
+    if (!email) {
+      console.error("Email não fornecido para processamento no ActiveCampaign");
+      throw new Error(
+        "Email é obrigatório para processamento no ActiveCampaign"
+      );
+    }
 
     // Split name into first and last name
     let firstName = name;
@@ -384,9 +405,11 @@ async function processLeadWithMockup(leadData, mockupUrl) {
     }
 
     // Find or create contact
+    console.log(`Buscando contato com email: ${email}`);
     let contact = await findContactByEmail(email);
 
     if (contact) {
+      console.log(`Contato encontrado com ID: ${contact.id}, atualizando...`);
       // Update existing contact
       contact = await updateContact(contact.id, {
         email,
@@ -394,7 +417,9 @@ async function processLeadWithMockup(leadData, mockupUrl) {
         lastName,
         phone,
       });
+      console.log(`Contato atualizado com sucesso: ${contact.id}`);
     } else {
+      console.log(`Contato não encontrado, criando novo contato...`);
       // Create new contact
       contact = await createContact({
         email,
@@ -402,32 +427,59 @@ async function processLeadWithMockup(leadData, mockupUrl) {
         lastName,
         phone,
       });
+      console.log(`Novo contato criado com ID: ${contact.id}`);
     }
 
     // Find or create mockup_url custom field
+    console.log("Buscando ou criando campo personalizado mockup_url...");
     const mockupField = await createOrUpdateCustomField("mockup_url");
+    console.log(`Campo mockup_url encontrado/criado com ID: ${mockupField.id}`);
 
     // Update custom field with mockup URL
+    console.log(
+      `Atualizando campo mockup_url para contato ${contact.id} com valor: ${mockupUrl}`
+    );
     await updateContactCustomField(contact.id, mockupField.id, mockupUrl);
+    console.log("Campo mockup_url atualizado com sucesso");
 
     // Process segmento field if provided
     if (segmento) {
-      console.log(`Processing segmento field: ${segmento}`);
+      console.log(`Processando campo segmento com valor: ${segmento}`);
       // Find or create segmento custom field
+      console.log(
+        "Buscando ou criando campo personalizado Segmento de Negócio..."
+      );
       const segmentoField = await createOrUpdateCustomField(
         "Segmento de Negócio",
         "DROPDOWN"
       );
+      console.log(
+        `Campo Segmento de Negócio encontrado/criado com ID: ${segmentoField.id}`
+      );
 
       // Update custom field with segmento value
+      console.log(
+        `Atualizando campo Segmento de Negócio para contato ${contact.id} com valor: ${segmento}`
+      );
       await updateContactCustomField(contact.id, segmentoField.id, segmento);
+      console.log("Campo Segmento de Negócio atualizado com sucesso");
+    } else {
+      console.log("Segmento não fornecido, pulando processamento deste campo");
     }
 
     // Find or create list for mockup leads
+    console.log("Buscando ou criando lista Mockup Leads...");
     const mockupList = await findOrCreateList("Mockup Leads");
+    console.log(
+      `Lista Mockup Leads encontrada/criada com ID: ${mockupList.id}`
+    );
 
     // Add contact to list
+    console.log(
+      `Adicionando contato ${contact.id} à lista ${mockupList.id}...`
+    );
     await addContactToList(contact.id, mockupList.id);
+    console.log(`Contato adicionado à lista com sucesso`);
 
     return {
       success: true,
