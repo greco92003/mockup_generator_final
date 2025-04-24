@@ -11,6 +11,7 @@ const activeCampaign = require("./active-campaign-api");
 const supabaseStorage = require("./supabase-storage");
 const awsLambdaConfig = require("./aws-lambda-config");
 const s3Upload = require("./s3-upload");
+const asyncProcessor = require("./async-processor");
 
 // Import optimized modules
 const PdfConverter = require("./optimized-pdf-converter");
@@ -582,18 +583,9 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
       console.log(`Total processing time: ${totalTime}ms`);
     }
 
-    // Process lead in ActiveCampaign
-    console.log("Processing lead in ActiveCampaign...");
-    try {
-      await activeCampaign.processLeadWithMockup(
-        { email, name, phone },
-        mockupUrl
-      );
-      console.log("Lead processed in ActiveCampaign successfully");
-    } catch (acError) {
-      console.error("Error processing lead in ActiveCampaign:", acError);
-      // Continue even if ActiveCampaign fails
-    }
+    // Process lead in ActiveCampaign asynchronously
+    console.log("Processing lead in ActiveCampaign asynchronously...");
+    asyncProcessor.processLeadAsync({ email, name, phone }, mockupUrl);
 
     // Return the result with WhatsApp redirect URL
     const response = {

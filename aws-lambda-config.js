@@ -2,6 +2,7 @@ const axios = require("axios");
 const dotenv = require("dotenv");
 const fs = require("fs");
 const path = require("path");
+const { withRetry } = require("./retry-helper");
 
 // Load environment variables
 dotenv.config();
@@ -34,20 +35,48 @@ async function generateMockupWithLambda(logoUrl, email, name) {
       headers["x-api-key"] = API_KEY;
     }
 
-    // Call the Lambda function via API Gateway
+    // Call the Lambda function via API Gateway with shorter timeout
     console.log("Calling Lambda function at:", LAMBDA_API_ENDPOINT);
     console.log("With headers:", headers);
     console.log("With payload:", { logoUrl, email, name });
 
-    const response = await axios.post(
-      LAMBDA_API_ENDPOINT,
-      {
-        logoUrl,
-        email,
-        name,
+    // Start timer for performance measurement
+    const lambdaStartTime = Date.now();
+
+    // Set a shorter timeout and use retry logic with exponential backoff
+    const response = await withRetry(
+      async () => {
+        console.log("Calling Lambda function...");
+        return axios.post(
+          LAMBDA_API_ENDPOINT,
+          {
+            logoUrl,
+            email,
+            name,
+          },
+          {
+            headers,
+            timeout: 8000, // 8 second timeout
+          }
+        );
       },
-      { headers }
+      {
+        maxRetries: 2, // Maximum 2 retries (3 attempts total)
+        initialDelay: 500, // Start with 500ms delay
+        maxDelay: 2000, // Maximum 2 second delay
+        shouldRetry: (error) => {
+          // Retry on network errors or 5xx server errors
+          return (
+            !error.response || // Network error
+            (error.response && error.response.status >= 500) // Server error
+          );
+        },
+      }
     );
+
+    // Log Lambda execution time
+    const lambdaTime = Date.now() - lambdaStartTime;
+    console.log(`Lambda execution time: ${lambdaTime}ms`);
 
     console.log("Lambda response status:", response.status);
     console.log(
