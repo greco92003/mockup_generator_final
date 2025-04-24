@@ -530,17 +530,104 @@ async function updateLeadMockupUrl(email, mockupUrl) {
 
     console.log(`Contato encontrado com ID: ${contact.id}`);
 
-    // Find or create mockup_url custom field
-    console.log("Buscando ou criando campo personalizado MOCKUPURL...");
-    const mockupField = await createOrUpdateCustomField("MOCKUPURL");
-    console.log(`Campo MOCKUPURL encontrado/criado com ID: ${mockupField.id}`);
+    // Find or create mockup_url custom field using multiple variations
+    console.log("Buscando campo personalizado para mockup URL...");
+
+    // Try different variations of the field name
+    const fieldVariations = [
+      "MOCKUPURL",
+      "mockup_url",
+      "mockupurl",
+      "Mockup URL",
+      "mockup url",
+      "MOCKUP_URL",
+      "Mockup Url",
+    ];
+
+    // Log the variations we're trying
+    console.log(
+      "Tentando as seguintes variações de nome de campo:",
+      fieldVariations.join(", ")
+    );
+
+    // Try to find the field using each variation
+    let mockupField = null;
+    for (const fieldName of fieldVariations) {
+      console.log(`Tentando encontrar campo com nome: "${fieldName}"`);
+      try {
+        const field = await createOrUpdateCustomField(fieldName);
+        if (field) {
+          mockupField = field;
+          console.log(
+            `Campo encontrado com nome "${fieldName}", ID: ${field.id}`
+          );
+          break;
+        }
+      } catch (fieldError) {
+        console.log(`Erro ao buscar campo "${fieldName}":`, fieldError.message);
+      }
+    }
+
+    // If we still couldn't find the field, try creating it with the primary name
+    if (!mockupField) {
+      console.log("Nenhum campo encontrado, criando novo campo MOCKUPURL...");
+      mockupField = await createOrUpdateCustomField("MOCKUPURL");
+    }
+
+    console.log(
+      `Campo para mockup URL encontrado/criado com ID: ${mockupField.id}, Título: ${mockupField.title}`
+    );
 
     // Update custom field with mockup URL
     console.log(
-      `Atualizando campo MOCKUPURL para contato ${contact.id} com valor: ${mockupUrl}`
+      `Atualizando campo "${mockupField.title}" (ID: ${mockupField.id}) para contato ${contact.id} com valor: ${mockupUrl}`
     );
-    await updateContactCustomField(contact.id, mockupField.id, mockupUrl);
-    console.log("Campo MOCKUPURL atualizado com sucesso");
+    const updatedField = await updateContactCustomField(
+      contact.id,
+      mockupField.id,
+      mockupUrl
+    );
+    console.log(
+      `Campo "${mockupField.title}" atualizado com sucesso:`,
+      JSON.stringify(updatedField)
+    );
+
+    // Verify the field was updated correctly
+    try {
+      console.log("Verificando se o campo foi atualizado corretamente...");
+      const response = await fetch(
+        `${AC_API_URL}/api/3/contacts/${contact.id}/fieldValues`,
+        {
+          method: "GET",
+          headers: {
+            "Api-Token": AC_API_KEY,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.fieldValues) {
+        const fieldValue = data.fieldValues.find(
+          (fv) => fv.field === mockupField.id
+        );
+        if (fieldValue) {
+          console.log(
+            `Valor atual do campo "${mockupField.title}": ${fieldValue.value}`
+          );
+        } else {
+          console.log(
+            `Campo "${mockupField.title}" não encontrado nos valores do contato`
+          );
+        }
+      } else {
+        console.log("Nenhum valor de campo encontrado para o contato");
+      }
+    } catch (verifyError) {
+      console.error("Erro ao verificar valores de campo:", verifyError);
+    }
 
     return {
       success: true,
