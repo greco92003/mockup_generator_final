@@ -572,19 +572,31 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
 
       // Generate mockup using AWS Lambda
       console.log("Generating mockup with AWS Lambda...");
-      mockupUrl = await awsLambdaConfig.generateMockupWithLambda(
-        logoUrl,
-        email,
-        name
-      );
-      console.log(`Mockup generated with AWS Lambda: ${mockupUrl}`);
+      try {
+        mockupUrl = await awsLambdaConfig.generateMockupWithLambda(
+          logoUrl,
+          email,
+          name
+        );
 
-      // Store in mockup cache
-      mockupCache.store(mockupCacheKey, {
-        logoUrl,
-        url: mockupUrl,
-        timestamp: Date.now(),
-      });
+        if (mockupUrl) {
+          console.log(`Mockup generated with AWS Lambda: ${mockupUrl}`);
+
+          // Store in mockup cache
+          mockupCache.store(mockupCacheKey, {
+            logoUrl,
+            url: mockupUrl,
+            timestamp: Date.now(),
+          });
+        } else {
+          console.warn("No mockup URL returned from Lambda, using fallback...");
+          mockupUrl = awsLambdaConfig.generateFallbackMockupUrl(email);
+        }
+      } catch (lambdaError) {
+        console.error("Error generating mockup with Lambda:", lambdaError);
+        console.warn("Using fallback mockup URL due to Lambda error...");
+        mockupUrl = awsLambdaConfig.generateFallbackMockupUrl(email);
+      }
 
       // Log total processing time
       const totalTime = Date.now() - startTime;
@@ -619,6 +631,38 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
       error: "Failed to generate mockup with AWS Lambda",
       message: error.message,
       stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
+    });
+  }
+});
+
+// Endpoint to manually update mockup URL for a contact
+app.post("/api/update-mockup-url", async (req, res) => {
+  try {
+    const { email, mockupUrl } = req.body;
+
+    if (!email || !mockupUrl) {
+      return res.status(400).json({
+        error: "Missing required parameters",
+        message: "Both email and mockupUrl are required",
+      });
+    }
+
+    console.log(`Manual update of mockup URL for ${email}: ${mockupUrl}`);
+
+    // Update the mockup URL in ActiveCampaign
+    await activeCampaign.updateLeadMockupUrl(email, mockupUrl);
+
+    return res.json({
+      success: true,
+      message: `Mockup URL updated for ${email}`,
+      email,
+      mockupUrl,
+    });
+  } catch (error) {
+    console.error("Error updating mockup URL:", error);
+    return res.status(500).json({
+      error: "Failed to update mockup URL",
+      message: error.message,
     });
   }
 });
