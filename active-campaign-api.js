@@ -608,13 +608,13 @@ async function processLeadBasicInfo(leadData) {
 /**
  * Update mockup URL for an existing contact
  * @param {string} email - Email of the contact
- * @param {string} mockupUrl - URL of the generated mockup
+ * @param {string} mockup_url - URL of the generated mockup
  * @returns {Promise<object>} - Result of the operation
  */
-async function updateLeadMockupUrl(email, mockupUrl) {
+async function updateLeadMockupUrl(email, mockup_url) {
   try {
     console.log(`Atualizando URL do mockup para o contato com email: ${email}`);
-    console.log("Mockup URL:", mockupUrl);
+    console.log("Mockup URL:", mockup_url);
 
     // Verificar se temos todos os dados necessários
     if (!email) {
@@ -622,7 +622,7 @@ async function updateLeadMockupUrl(email, mockupUrl) {
       throw new Error("Email é obrigatório para atualização do mockup URL");
     }
 
-    if (!mockupUrl) {
+    if (!mockup_url) {
       console.error("URL do mockup não fornecido");
       throw new Error("URL do mockup é obrigatório");
     }
@@ -686,7 +686,7 @@ async function updateLeadMockupUrl(email, mockupUrl) {
 
     // Update custom field with mockup URL using multiple approaches
     console.log(
-      `Atualizando campo "${mockupField.title}" (ID: ${mockupField.id}) para contato ${contact.id} com valor: ${mockupUrl}`
+      `Atualizando campo "${mockupField.title}" (ID: ${mockupField.id}) para contato ${contact.id} com valor: ${mockup_url}`
     );
 
     // Try the standard approach first
@@ -695,7 +695,7 @@ async function updateLeadMockupUrl(email, mockupUrl) {
       const updatedField = await updateContactCustomField(
         contact.id,
         mockupField.id,
-        mockupUrl
+        mockup_url
       );
       console.log(
         `Campo "${mockupField.title}" atualizado com sucesso (abordagem padrão):`,
@@ -718,7 +718,7 @@ async function updateLeadMockupUrl(email, mockupUrl) {
             fieldValue: {
               contact: contact.id,
               field: 41, // Hardcoded ID for mockup_url
-              value: mockupUrl,
+              value: mockup_url,
             },
           }),
         });
@@ -776,7 +776,7 @@ async function updateLeadMockupUrl(email, mockupUrl) {
           );
 
           // Check if the value matches what we set
-          if (fieldValue.value === mockupUrl) {
+          if (fieldValue.value === mockup_url) {
             console.log(
               "✅ Campo atualizado com sucesso! O valor corresponde ao URL do mockup."
             );
@@ -784,7 +784,7 @@ async function updateLeadMockupUrl(email, mockupUrl) {
             console.warn(
               "⚠️ Campo atualizado, mas o valor não corresponde exatamente ao URL do mockup."
             );
-            console.log("Valor esperado:", mockupUrl);
+            console.log("Valor esperado:", mockup_url);
             console.log("Valor atual:", fieldValue.value);
           }
         } else {
@@ -816,7 +816,7 @@ async function updateLeadMockupUrl(email, mockupUrl) {
     return {
       success: true,
       contact,
-      mockupUrl,
+      mockup_url,
     };
   } catch (error) {
     console.error("Erro ao atualizar URL do mockup:", error);
@@ -827,10 +827,10 @@ async function updateLeadMockupUrl(email, mockupUrl) {
 /**
  * Process a lead for mockup generation (legacy function for backward compatibility)
  * @param {object} leadData - Lead data
- * @param {string} mockupUrl - URL of the generated mockup
+ * @param {string} mockup_url - URL of the generated mockup
  * @returns {Promise<object>} - Result of the operation
  */
-async function processLeadWithMockup(leadData, mockupUrl) {
+async function processLeadWithMockup(leadData, mockup_url) {
   try {
     console.log(
       "Usando função legada processLeadWithMockup. Processando dados básicos primeiro..."
@@ -841,7 +841,7 @@ async function processLeadWithMockup(leadData, mockupUrl) {
 
     // Then update mockup URL
     console.log("Atualizando URL do mockup...");
-    return await updateLeadMockupUrl(leadData.email, mockupUrl);
+    return await updateLeadMockupUrl(leadData.email, mockup_url);
   } catch (error) {
     console.error("Error processing lead with mockup:", error);
     throw error;
