@@ -47,9 +47,7 @@ async function pdfBufferToPng(buffer, filename = "logo.pdf") {
           engine: "mupdf", // Usar a engine padrão MuPDF em vez de GraphicsMagick
           pages: "1", // first page only
           pixel_density: 72,
-          width: 326,
-          height: 200,
-          fit: "contain", // Preservar a proporção do logo
+          width: 326, // Apenas definir a largura, altura será calculada automaticamente
           alpha: true, // Render with transparent background
           filename: filename.replace(/\.pdf$/i, ".png"),
         },

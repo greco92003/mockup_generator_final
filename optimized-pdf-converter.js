@@ -81,9 +81,7 @@ class PdfConverter {
             output_format: "png",
             engine: "mupdf", // Usar a engine padrão MuPDF em vez de GraphicsMagick
             pixel_density: 72,
-            width: 326,
-            height: 200,
-            fit: "contain", // Preservar a proporção do logo
+            width: 326, // Apenas definir a largura, altura será calculada automaticamente
             alpha: true, // Transparent background
             strip: true, // Strip metadata for smaller files
             trim: false, // Don't trim as it might affect positioning
