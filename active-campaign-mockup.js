@@ -553,6 +553,22 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
       // Log cache statistics
       const cacheStats = mockupCache.getStats();
       console.log(`Mockup cache statistics: ${JSON.stringify(cacheStats)}`);
+
+      // Store the original logo URL in ActiveCampaign even when using cached mockup
+      console.log(
+        "Armazenando URL do logotipo original no campo mockup_logotipo (do cache)..."
+      );
+      try {
+        // Use the dedicated function to update the logo URL
+        await activeCampaign.updateLeadLogoUrl(email, logoUrl);
+        console.log("Campo mockup_logotipo atualizado com sucesso (do cache)");
+      } catch (logoUrlError) {
+        console.error(
+          "Erro ao atualizar campo mockup_logotipo no ActiveCampaign (do cache):",
+          logoUrlError
+        );
+        // Continue with the process even if this update fails
+      }
     } else {
       // Start timer for performance measurement
       const startTime = Date.now();
@@ -572,6 +588,22 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
       const uploadResult = await uploadPromise;
       logoUrl = uploadResult.url;
       console.log(`Logo uploaded to S3: ${logoUrl}`);
+
+      // Store the original logo URL in ActiveCampaign
+      console.log(
+        "Armazenando URL do logotipo original no campo mockup_logotipo..."
+      );
+      try {
+        // Use the dedicated function to update the logo URL
+        await activeCampaign.updateLeadLogoUrl(email, logoUrl);
+        console.log("Campo mockup_logotipo atualizado com sucesso");
+      } catch (logoUrlError) {
+        console.error(
+          "Erro ao atualizar campo mockup_logotipo no ActiveCampaign:",
+          logoUrlError
+        );
+        // Continue with the process even if this update fails
+      }
 
       // Generate mockup using AWS Lambda
       console.log("Generating mockup with AWS Lambda...");
@@ -791,6 +823,38 @@ app.post("/api/update-mockup-url", async (req, res) => {
     console.error("Error updating mockup URL:", error);
     return res.status(500).json({
       error: "Failed to update mockup URL",
+      message: error.message,
+    });
+  }
+});
+
+// Endpoint to update the mockup_logotipo field (ID: 42)
+app.post("/api/update-logo-url", async (req, res) => {
+  try {
+    const { email, logoUrl } = req.body;
+
+    if (!email || !logoUrl) {
+      return res.status(400).json({
+        error: "Missing required parameters",
+        message: "Both email and logoUrl are required",
+      });
+    }
+
+    console.log(`Manual update of logo URL for ${email}: ${logoUrl}`);
+
+    // Update the logo URL in ActiveCampaign
+    await activeCampaign.updateLeadLogoUrl(email, logoUrl);
+
+    return res.json({
+      success: true,
+      message: `Logo URL updated for ${email}`,
+      email,
+      logoUrl,
+    });
+  } catch (error) {
+    console.error("Error updating logo URL:", error);
+    return res.status(500).json({
+      error: "Failed to update logo URL",
       message: error.message,
     });
   }

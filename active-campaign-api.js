@@ -849,6 +849,118 @@ async function processLeadWithMockup(leadData, mockup_url) {
 }
 
 /**
+ * Update logo URL for an existing contact
+ * @param {string} email - Email of the contact
+ * @param {string} logo_url - URL of the original logo
+ * @returns {Promise<object>} - Result of the operation
+ */
+async function updateLeadLogoUrl(email, logo_url) {
+  try {
+    console.log(
+      `Atualizando URL do logotipo original para o contato com email: ${email}`
+    );
+    console.log("Logo URL:", logo_url);
+
+    // Verificar se temos todos os dados necessários
+    if (!email) {
+      console.error("Email não fornecido para atualização do logo URL");
+      throw new Error("Email é obrigatório para atualização do logo URL");
+    }
+
+    if (!logo_url) {
+      console.error("URL do logotipo não fornecido");
+      throw new Error("URL do logotipo é obrigatório");
+    }
+
+    // Find contact
+    console.log(`Buscando contato com email: ${email}`);
+    const contact = await findContactByEmail(email);
+
+    if (!contact) {
+      console.error(`Contato com email ${email} não encontrado`);
+      throw new Error(`Contato com email ${email} não encontrado`);
+    }
+
+    console.log(`Contato encontrado com ID: ${contact.id}`);
+
+    // Use the known field ID directly (ID: 42, Título: mockup_logotipo, Tipo: text)
+    console.log("Usando ID conhecido do campo mockup_logotipo (ID: 42)...");
+
+    // Create a logoField object with the known information
+    const logoField = {
+      id: 42,
+      title: "mockup_logotipo",
+      type: "text",
+    };
+
+    console.log(`Usando campo mockup_logotipo com ID: ${logoField.id}`);
+
+    // Update custom field with logo URL
+    console.log(
+      `Atualizando campo "${logoField.title}" (ID: ${logoField.id}) para contato ${contact.id} com valor: ${logo_url}`
+    );
+
+    // Try the standard approach first
+    try {
+      console.log("Tentando atualizar campo usando abordagem padrão...");
+      const updatedField = await updateContactCustomField(
+        contact.id,
+        logoField.id,
+        logo_url
+      );
+      console.log(
+        `Campo "${logoField.title}" atualizado com sucesso (abordagem padrão):`,
+        JSON.stringify(updatedField)
+      );
+    } catch (updateError) {
+      console.error("Erro na atualização padrão:", updateError);
+
+      // Try a direct API call as a fallback
+      try {
+        console.log("Tentando atualização direta via API...");
+        const directResponse = await fetch(`${AC_API_URL}/api/3/fieldValues`, {
+          method: "POST",
+          headers: {
+            "Api-Token": AC_API_KEY,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({
+            fieldValue: {
+              contact: contact.id,
+              field: 42, // Hardcoded ID for mockup_logotipo
+              value: logo_url,
+            },
+          }),
+        });
+
+        const directData = await directResponse.json();
+
+        if (directData.fieldValue) {
+          console.log(
+            "Campo atualizado com sucesso via API direta:",
+            directData.fieldValue
+          );
+        } else {
+          console.error("Falha na atualização direta:", directData);
+        }
+      } catch (directError) {
+        console.error("Erro na atualização direta:", directError);
+      }
+    }
+
+    return {
+      success: true,
+      contact,
+      logo_url,
+    };
+  } catch (error) {
+    console.error("Erro ao atualizar URL do logotipo:", error);
+    throw error;
+  }
+}
+
+/**
  * Get all field values for a contact
  * @param {number} contactId - Contact ID
  * @returns {Promise<Array>} - Field values
@@ -963,5 +1075,6 @@ module.exports = {
   processLeadWithMockup,
   processLeadBasicInfo,
   updateLeadMockupUrl,
+  updateLeadLogoUrl,
   getContactFieldValues,
 };
