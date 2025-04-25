@@ -112,6 +112,16 @@ async function getPresignedUrlFromS3Url(
   try {
     console.log(`Getting pre-signed URL for S3 URL: ${url}`);
 
+    // Ensure we're using the latest AWS credentials
+    AWS.config.update({
+      region: process.env.AWS_REGION || "us-east-1",
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    });
+
+    // Reinitialize S3 client with updated credentials
+    const s3Client = new AWS.S3();
+
     // Extract the key from the S3 URL
     // URL format could be one of:
     // 1. https://bucket-name.s3.amazonaws.com/key
@@ -150,6 +160,32 @@ async function getPresignedUrlFromS3Url(
     }
 
     console.log(`Extracted bucket: ${bucket}, key: ${key}`);
+    console.log(
+      `Using AWS credentials: Access Key ID: ${process.env.AWS_ACCESS_KEY_ID.substring(
+        0,
+        5
+      )}...`
+    );
+    console.log(`Using AWS region: ${process.env.AWS_REGION || "us-east-1"}`);
+
+    // Verify the object exists before generating a pre-signed URL
+    try {
+      console.log(`Verifying object exists: Bucket=${bucket}, Key=${key}`);
+      const headParams = {
+        Bucket: bucket,
+        Key: key,
+      };
+
+      await s3Client.headObject(headParams).promise();
+      console.log(
+        "Object exists in S3, proceeding with pre-signed URL generation"
+      );
+    } catch (headError) {
+      console.warn(
+        `Warning: Could not verify object existence: ${headError.message}`
+      );
+      console.log("Continuing with pre-signed URL generation anyway...");
+    }
 
     // Generate pre-signed URL with explicit bucket and key
     const params = {
@@ -162,9 +198,42 @@ async function getPresignedUrlFromS3Url(
       `Generating pre-signed URL with params: ${JSON.stringify(params)}`
     );
 
-    const presignedUrl = await s3.getSignedUrlPromise("getObject", params);
+    const presignedUrl = await s3Client.getSignedUrlPromise(
+      "getObject",
+      params
+    );
+
+    // Validate the generated URL
+    if (!presignedUrl) {
+      console.error("Generated URL is undefined or empty");
+      throw new Error("Failed to generate valid pre-signed URL");
+    }
+
+    // Check if the URL contains AWS access key parameters
+    // It could be either X-Amz-Signature (v4) or AWSAccessKeyId (v2)
+    if (
+      presignedUrl.includes("X-Amz-Signature=") ||
+      presignedUrl.includes("AWSAccessKeyId=")
+    ) {
+      console.log(
+        "Valid pre-signed URL generated with AWS authentication parameters"
+      );
+    } else {
+      console.warn(
+        "Generated URL does not contain expected AWS authentication parameters"
+      );
+      console.log(
+        "This might still be valid depending on your AWS configuration"
+      );
+    }
+
     console.log(
       `Pre-signed URL generated: ${presignedUrl.substring(0, 100)}...`
+    );
+    console.log(
+      `URL will expire in ${expirationSeconds} seconds (${Math.round(
+        expirationSeconds / 86400
+      )} days)`
     );
 
     return presignedUrl;

@@ -914,18 +914,128 @@ app.post("/api/update-logo-url", async (req, res) => {
     console.log(`Manual update of logo URL for ${email}: ${logoUrl}`);
 
     // Update the logo URL in ActiveCampaign
-    await activeCampaign.updateLeadLogoUrl(email, logoUrl);
+    const result = await activeCampaign.updateLeadLogoUrl(email, logoUrl);
 
     return res.json({
       success: true,
       message: `Logo URL updated for ${email}`,
       email,
       logoUrl,
+      result,
     });
   } catch (error) {
     console.error("Error updating logo URL:", error);
     return res.status(500).json({
       error: "Failed to update logo URL",
+      message: error.message,
+    });
+  }
+});
+
+// Endpoint to test S3 pre-signed URL generation
+app.post("/api/test-presigned-url", async (req, res) => {
+  try {
+    const { url } = req.body;
+
+    if (!url) {
+      return res.status(400).json({
+        error: "Missing required parameter",
+        message: "S3 URL is required",
+      });
+    }
+
+    console.log(`Testing pre-signed URL generation for: ${url}`);
+
+    // Import the s3Upload module
+    const s3Upload = require("./s3-upload");
+
+    // Generate pre-signed URL
+    const presignedUrl = await s3Upload.getPresignedUrlFromS3Url(url);
+
+    return res.json({
+      success: true,
+      message: "Pre-signed URL generated successfully",
+      originalUrl: url,
+      presignedUrl,
+    });
+  } catch (error) {
+    console.error("Error generating pre-signed URL:", error);
+    return res.status(500).json({
+      error: "Failed to generate pre-signed URL",
+      message: error.message,
+    });
+  }
+});
+
+// Endpoint to test the complete flow of updating mockup_logotipo field
+app.post("/api/test-logo-url-flow", async (req, res) => {
+  try {
+    const { email, logoUrl } = req.body;
+
+    if (!email || !logoUrl) {
+      return res.status(400).json({
+        error: "Missing required parameters",
+        message: "Both email and logoUrl are required",
+      });
+    }
+
+    console.log(`Testing complete flow for updating logo URL for ${email}`);
+    console.log(`Original logo URL: ${logoUrl}`);
+
+    // Step 1: Generate pre-signed URL if it's an S3 URL
+    let presignedUrl = logoUrl;
+    if (logoUrl.includes("s3.amazonaws.com")) {
+      try {
+        const s3Upload = require("./s3-upload");
+        console.log("Generating pre-signed URL...");
+        presignedUrl = await s3Upload.getPresignedUrlFromS3Url(logoUrl);
+        console.log("Pre-signed URL generated successfully");
+      } catch (presignError) {
+        console.error("Error generating pre-signed URL:", presignError);
+        return res.status(500).json({
+          error: "Failed to generate pre-signed URL",
+          message: presignError.message,
+        });
+      }
+    }
+
+    // Step 2: Update the logo URL in ActiveCampaign
+    console.log("Updating logo URL in ActiveCampaign...");
+    const updateResult = await activeCampaign.updateLeadLogoUrl(email, logoUrl);
+
+    // Step 3: Verify the update by getting the contact's field values
+    console.log("Verifying update...");
+    const contact = await activeCampaign.findContactByEmail(email);
+
+    if (!contact) {
+      return res.status(404).json({
+        error: "Contact not found",
+        message: `No contact found with email: ${email}`,
+      });
+    }
+
+    const fieldValues = await activeCampaign.getContactFieldValues(contact.id);
+    const logoField = fieldValues.find((field) => parseInt(field.id) === 42);
+
+    return res.json({
+      success: true,
+      message: "Logo URL update flow completed",
+      email,
+      originalUrl: logoUrl,
+      presignedUrl:
+        presignedUrl !== logoUrl
+          ? presignedUrl
+          : "Not generated (not an S3 URL)",
+      updateResult,
+      verification: {
+        contactId: contact.id,
+        logoField,
+      },
+    });
+  } catch (error) {
+    console.error("Error in logo URL update flow:", error);
+    return res.status(500).json({
+      error: "Failed to complete logo URL update flow",
       message: error.message,
     });
   }

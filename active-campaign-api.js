@@ -903,8 +903,21 @@ async function updateLeadLogoUrl(email, logo_url, usePresignedUrl = true) {
         // Import the s3Upload module dynamically to avoid circular dependencies
         const s3Upload = require("./s3-upload");
         console.log("Gerando URL pré-assinada para o logotipo...");
+
+        // Ensure we're using the latest AWS credentials
+        const AWS = require("aws-sdk");
+        AWS.config.update({
+          region: process.env.AWS_REGION || "us-east-1",
+          accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+        });
+
         finalLogoUrl = await s3Upload.getPresignedUrlFromS3Url(logo_url);
         console.log("URL pré-assinada gerada com sucesso");
+        console.log(
+          "URL pré-assinada (primeiros 100 caracteres):",
+          finalLogoUrl.substring(0, 100) + "..."
+        );
       } catch (presignError) {
         console.error("Erro ao gerar URL pré-assinada:", presignError);
         console.log("Usando URL original do logotipo");
@@ -915,7 +928,15 @@ async function updateLeadLogoUrl(email, logo_url, usePresignedUrl = true) {
     console.log(
       `Atualizando campo "${logoField.title}" (ID: ${logoField.id}) para contato ${contact.id}`
     );
-    console.log(`URL a ser armazenada: ${finalLogoUrl.substring(0, 100)}...`);
+    console.log(
+      `URL a ser armazenada (primeiros 100 caracteres): ${finalLogoUrl.substring(
+        0,
+        100
+      )}...`
+    );
+
+    let updateSuccess = false;
+    let updateResult = null;
 
     // Try the standard approach first
     try {
@@ -929,6 +950,8 @@ async function updateLeadLogoUrl(email, logo_url, usePresignedUrl = true) {
         `Campo "${logoField.title}" atualizado com sucesso (abordagem padrão):`,
         JSON.stringify(updatedField)
       );
+      updateSuccess = true;
+      updateResult = updatedField;
     } catch (updateError) {
       console.error("Erro na atualização padrão:", updateError);
 
@@ -958,6 +981,8 @@ async function updateLeadLogoUrl(email, logo_url, usePresignedUrl = true) {
             "Campo atualizado com sucesso via API direta:",
             directData.fieldValue
           );
+          updateSuccess = true;
+          updateResult = directData.fieldValue;
         } else {
           console.error("Falha na atualização direta:", directData);
         }
@@ -966,10 +991,51 @@ async function updateLeadLogoUrl(email, logo_url, usePresignedUrl = true) {
       }
     }
 
+    // Verify the update was successful
+    if (updateSuccess) {
+      try {
+        console.log("Verificando se o campo foi atualizado corretamente...");
+        const fieldValues = await getContactFieldValues(contact.id);
+        const logoFieldValue = fieldValues.find(
+          (field) => parseInt(field.id) === logoField.id
+        );
+
+        if (logoFieldValue) {
+          console.log(
+            `Valor atual do campo "${
+              logoField.title
+            }": ${logoFieldValue.value.substring(0, 100)}...`
+          );
+
+          // Check if the value contains the expected parts of the URL
+          if (
+            logoFieldValue.value.includes("s3.amazonaws.com") &&
+            (logoFieldValue.value.includes("X-Amz-Signature=") ||
+              logoFieldValue.value.includes("AWSAccessKeyId="))
+          ) {
+            console.log(
+              "✅ Campo verificado e contém uma URL pré-assinada válida"
+            );
+          } else {
+            console.warn(
+              "⚠️ Campo atualizado, mas a URL não parece ser uma URL pré-assinada válida"
+            );
+          }
+        } else {
+          console.warn(
+            `⚠️ Campo "${logoField.title}" não encontrado após atualização`
+          );
+        }
+      } catch (verifyError) {
+        console.error("Erro ao verificar atualização do campo:", verifyError);
+      }
+    }
+
     return {
-      success: true,
+      success: updateSuccess,
       contact,
       logo_url: finalLogoUrl,
+      updateResult,
     };
   } catch (error) {
     console.error("Erro ao atualizar URL do logotipo:", error);
