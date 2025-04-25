@@ -15,6 +15,9 @@ AWS.config.update({
 // Initialize S3 client
 const s3 = new AWS.S3();
 
+// Default expiration time for pre-signed URLs (7 days in seconds)
+const DEFAULT_EXPIRATION = 7 * 24 * 60 * 60;
+
 /**
  * Upload a file to S3
  * @param {Buffer} fileBuffer - File buffer to upload
@@ -57,6 +60,72 @@ async function uploadToS3(fileBuffer, fileName, folder = "logos") {
   }
 }
 
+/**
+ * Generate a pre-signed URL for an S3 object
+ * @param {string} key - S3 object key
+ * @param {number} expirationSeconds - Expiration time in seconds (default: 7 days)
+ * @returns {Promise<string>} - Pre-signed URL
+ */
+async function generatePresignedUrl(
+  key,
+  expirationSeconds = DEFAULT_EXPIRATION
+) {
+  try {
+    console.log(`Generating pre-signed URL for S3 object: ${key}`);
+    console.log(
+      `URL will expire in ${expirationSeconds} seconds (${Math.round(
+        expirationSeconds / 86400
+      )} days)`
+    );
+
+    const params = {
+      Bucket: process.env.S3_BUCKET || "mockup-hudlab",
+      Key: key,
+      Expires: expirationSeconds,
+    };
+
+    const url = await s3.getSignedUrlPromise("getObject", params);
+    console.log(`Pre-signed URL generated: ${url.substring(0, 100)}...`);
+
+    return url;
+  } catch (error) {
+    console.error("Error generating pre-signed URL:", error);
+    throw error;
+  }
+}
+
+/**
+ * Get a pre-signed URL for an existing S3 object
+ * @param {string} url - S3 object URL
+ * @param {number} expirationSeconds - Expiration time in seconds (default: 7 days)
+ * @returns {Promise<string>} - Pre-signed URL
+ */
+async function getPresignedUrlFromS3Url(
+  url,
+  expirationSeconds = DEFAULT_EXPIRATION
+) {
+  try {
+    console.log(`Getting pre-signed URL for S3 URL: ${url}`);
+
+    // Extract the key from the S3 URL
+    // URL format: https://bucket-name.s3.amazonaws.com/key
+    const urlObj = new URL(url);
+    const pathParts = urlObj.pathname
+      .split("/")
+      .filter((part) => part.length > 0);
+    const key = pathParts.join("/");
+
+    console.log(`Extracted key from URL: ${key}`);
+
+    return await generatePresignedUrl(key, expirationSeconds);
+  } catch (error) {
+    console.error("Error getting pre-signed URL from S3 URL:", error);
+    throw error;
+  }
+}
+
 module.exports = {
   uploadToS3,
+  generatePresignedUrl,
+  getPresignedUrlFromS3Url,
 };

@@ -852,14 +852,15 @@ async function processLeadWithMockup(leadData, mockup_url) {
  * Update logo URL for an existing contact
  * @param {string} email - Email of the contact
  * @param {string} logo_url - URL of the original logo
+ * @param {boolean} usePresignedUrl - Whether to generate a pre-signed URL for the logo
  * @returns {Promise<object>} - Result of the operation
  */
-async function updateLeadLogoUrl(email, logo_url) {
+async function updateLeadLogoUrl(email, logo_url, usePresignedUrl = true) {
   try {
     console.log(
       `Atualizando URL do logotipo original para o contato com email: ${email}`
     );
-    console.log("Logo URL:", logo_url);
+    console.log("Logo URL original:", logo_url);
 
     // Verificar se temos todos os dados necessários
     if (!email) {
@@ -895,10 +896,26 @@ async function updateLeadLogoUrl(email, logo_url) {
 
     console.log(`Usando campo mockup_logotipo com ID: ${logoField.id}`);
 
+    // Generate pre-signed URL if requested
+    let finalLogoUrl = logo_url;
+    if (usePresignedUrl && logo_url.includes("s3.amazonaws.com")) {
+      try {
+        // Import the s3Upload module dynamically to avoid circular dependencies
+        const s3Upload = require("./s3-upload");
+        console.log("Gerando URL pré-assinada para o logotipo...");
+        finalLogoUrl = await s3Upload.getPresignedUrlFromS3Url(logo_url);
+        console.log("URL pré-assinada gerada com sucesso");
+      } catch (presignError) {
+        console.error("Erro ao gerar URL pré-assinada:", presignError);
+        console.log("Usando URL original do logotipo");
+      }
+    }
+
     // Update custom field with logo URL
     console.log(
-      `Atualizando campo "${logoField.title}" (ID: ${logoField.id}) para contato ${contact.id} com valor: ${logo_url}`
+      `Atualizando campo "${logoField.title}" (ID: ${logoField.id}) para contato ${contact.id}`
     );
+    console.log(`URL a ser armazenada: ${finalLogoUrl.substring(0, 100)}...`);
 
     // Try the standard approach first
     try {
@@ -906,7 +923,7 @@ async function updateLeadLogoUrl(email, logo_url) {
       const updatedField = await updateContactCustomField(
         contact.id,
         logoField.id,
-        logo_url
+        finalLogoUrl
       );
       console.log(
         `Campo "${logoField.title}" atualizado com sucesso (abordagem padrão):`,
@@ -929,7 +946,7 @@ async function updateLeadLogoUrl(email, logo_url) {
             fieldValue: {
               contact: contact.id,
               field: 42, // Hardcoded ID for mockup_logotipo
-              value: logo_url,
+              value: finalLogoUrl,
             },
           }),
         });
@@ -952,7 +969,7 @@ async function updateLeadLogoUrl(email, logo_url) {
     return {
       success: true,
       contact,
-      logo_url,
+      logo_url: finalLogoUrl,
     };
   } catch (error) {
     console.error("Erro ao atualizar URL do logotipo:", error);
