@@ -79,8 +79,7 @@ class PdfConverter {
             input: "upload_logo",
             input_format: "pdf",
             output_format: "png",
-            engine: "graphicsmagick", // Faster engine
-            engine_version: "1.3.36",
+            engine: "mupdf", // Usar a engine padrão MuPDF em vez de GraphicsMagick
             pixel_density: 72,
             width: 326,
             height: 200,

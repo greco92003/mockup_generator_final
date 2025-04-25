@@ -46,6 +46,7 @@ async function pdfBufferToPng(buffer, filename = "logo.pdf") {
           input: "upload_logo",
           input_format: "pdf",
           output_format: "png",
+          engine: "mupdf", // Usar a engine padrão MuPDF em vez de GraphicsMagick
           pages: "1", // first page only
           pixel_density: 72,
           width: 326,
