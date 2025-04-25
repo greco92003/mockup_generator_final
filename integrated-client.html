@@ -386,6 +386,8 @@
         fileInput.addEventListener("change", function () {
           if (this.files && this.files[0]) {
             fileName.textContent = this.files[0].name;
+            // Esconder a mensagem de erro se um arquivo for selecionado
+            logoError.style.display = "none";
           } else {
             fileName.textContent = "Nenhum arquivo selecionado";
           }
@@ -416,6 +418,7 @@
           // Validate logo file
           const logoFile = document.getElementById("logo").files[0];
           if (!logoFile) {
+            logoError.textContent = "Por favor, selecione um arquivo de logo.";
             logoError.style.display = "block";
             return;
           }
@@ -423,6 +426,8 @@
           // Check file type
           const validTypes = ["image/png", "image/jpeg", "application/pdf"];
           if (!validTypes.includes(logoFile.type)) {
+            logoError.textContent =
+              "Por favor, selecione um arquivo PNG, JPG ou PDF.";
             logoError.style.display = "block";
             return;
           }
