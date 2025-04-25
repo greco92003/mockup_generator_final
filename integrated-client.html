@@ -64,6 +64,7 @@
         border-radius: 4px;
         font-size: 16px;
         transition: border-color 0.3s;
+        box-sizing: border-box; /* Garante que padding não aumente a largura */
       }
 
       input[type="text"]:focus,
@@ -81,7 +82,7 @@
       }
 
       .file-input-label {
-        display: inline-block;
+        display: block; /* Alterado de inline-block para block */
         background-color: #e9ecef;
         color: #495057;
         padding: 12px 20px;
@@ -119,6 +120,8 @@
         font-size: 16px;
         font-weight: 600;
         width: 100%;
+        box-sizing: border-box; /* Garante que padding não aumente a largura */
+        display: block; /* Garante que ocupe toda a linha */
         transition: background-color 0.3s;
       }
 
@@ -273,6 +276,9 @@
         border-radius: 4px;
         font-size: 14px;
         line-height: 1.5;
+        width: 100%;
+        box-sizing: border-box;
+        text-align: justify; /* Texto justificado */
       }
 
       .disclaimer-box strong {
