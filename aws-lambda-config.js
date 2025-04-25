@@ -56,7 +56,7 @@ async function generateMockupWithLambda(logoUrl, email, name) {
           },
           {
             headers,
-            timeout: 8000, // 8 second timeout
+            timeout: 30000, // 30 second timeout
           }
         );
       },
@@ -194,18 +194,16 @@ async function generateMockupWithLambda(logoUrl, email, name) {
  * @returns {string} - Fallback mockup URL
  */
 function generateFallbackMockupUrl(email) {
-  // Use a default mockup URL for fallback
-  // This could be a generic mockup image stored in S3 or another location
+  // Use a static default mockup URL for fallback
+  // This should be a URL to a generic mockup image that definitely exists
 
-  // For now, we'll use a predefined URL pattern with the email encoded
-  const sanitizedEmail = email.replace(/[@.]/g, "-");
-  const timestamp = Date.now();
+  // Use a fixed URL to a default mockup that we know exists
+  // This is a placeholder - replace with an actual URL to a default mockup image
+  const fallbackUrl =
+    process.env.DEFAULT_MOCKUP_URL ||
+    "https://mockup-hudlab.s3.amazonaws.com/mockups/default-mockup.png";
 
-  // Use a default mockup URL from S3 or another source
-  // This should be a valid URL to a generic mockup image
-  const fallbackUrl = `https://mockup-hudlab.s3.amazonaws.com/fallback/default-mockup-${sanitizedEmail}-${timestamp}.png`;
-
-  console.log(`Generated fallback mockup URL for ${email}: ${fallbackUrl}`);
+  console.log(`Using static fallback mockup URL for ${email}: ${fallbackUrl}`);
 
   return fallbackUrl;
 }
