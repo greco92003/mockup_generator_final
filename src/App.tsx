@@ -1,5 +1,6 @@
 import { useState, FormEvent } from "react";
 import "./App.css";
+import CustomFileUploader from "./components/FileUploader";
 
 function App() {
   const [formData, setFormData] = useState({
@@ -20,17 +21,15 @@ function App() {
     }));
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      setFile(e.target.files[0]);
-    }
+  const handleFileChange = (newFile: File | null) => {
+    setFile(newFile);
   };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (!file) {
-      setError("Please select a logo file");
+      setError("Por favor, selecione um arquivo de logo");
       return;
     }
 
@@ -111,14 +110,10 @@ function App() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="logo">Logo (PDF, PNG, JPG)</label>
-            <input
-              type="file"
-              id="logo"
-              name="logo"
-              accept=".pdf,.png,.jpg,.jpeg"
-              onChange={handleFileChange}
-              required
+            <label htmlFor="logo">Logo</label>
+            <CustomFileUploader
+              onFileChange={handleFileChange}
+              error={error !== null && error.includes("logo")}
             />
           </div>
 
