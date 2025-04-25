@@ -80,10 +80,8 @@ class PdfConverter {
             output_format: "png",
             engine: "graphicsmagick", // Faster engine
             engine_version: "1.3.36",
+            density: 300, // DPI for quality
             alpha: true, // Transparent background
-            width: 326, // Optimal width for chinelo logo (2x max size)
-            height: 200, // Optimal height for chinelo logo (2x max size)
-            fit: "contain", // Preserve aspect ratio
             strip: true, // Strip metadata for smaller files
             trim: false, // Don't trim as it might affect positioning
             quality: 90, // Slightly reduced quality for faster conversion
@@ -112,9 +110,23 @@ class PdfConverter {
       console.log("Waiting for conversion to complete...");
       const completed = await this.cloudConvert.jobs.wait(job.id);
       console.log("Conversion completed");
+      console.log("CloudConvert response:", JSON.stringify(completed, null, 2));
+
+      // Check if the response contains export URLs
+      const exportUrls = this.cloudConvert.jobs.getExportUrls(completed);
+      console.log("Export URLs:", JSON.stringify(exportUrls, null, 2));
+
+      if (!exportUrls || exportUrls.length === 0) {
+        throw new Error("No export URLs found in CloudConvert response");
+      }
 
       // Download the generated PNG
-      const file = this.cloudConvert.jobs.getExportUrls(completed)[0];
+      const file = exportUrls[0];
+
+      if (!file || !file.url) {
+        throw new Error("Invalid export URL in CloudConvert response");
+      }
+
       console.log(`Download URL: ${file.url}`);
 
       const localPath = path.join(this.tempDir, file.filename);

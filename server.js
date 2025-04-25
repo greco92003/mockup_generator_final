@@ -47,9 +47,7 @@ async function pdfBufferToPng(buffer, filename = "logo.pdf") {
           output_format: "png",
           pages: "1", // first page only
           alpha: true, // Render with transparent background
-          width: 326, // Optimal width for chinelo logo (2x max size)
-          height: 200, // Optimal height for chinelo logo (2x max size)
-          fit: "contain", // Preserve aspect ratio
+          density: 300, // Higher quality
           filename: filename.replace(/\.pdf$/i, ".png"),
         },
         export_logo: { operation: "export/url", input: "convert_logo" },
