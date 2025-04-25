@@ -51,6 +51,7 @@ async function pdfBufferToPng(buffer, filename = "logo.pdf") {
           pixel_density: 72,
           width: 326,
           height: 200,
+          fit: "contain", // Preservar a proporção do logo
           alpha: true, // Render with transparent background
           filename: filename.replace(/\.pdf$/i, ".png"),
         },

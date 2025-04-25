@@ -83,6 +83,7 @@ class PdfConverter {
             pixel_density: 72,
             width: 326,
             height: 200,
+            fit: "contain", // Preservar a proporção do logo
             alpha: true, // Transparent background
             strip: true, // Strip metadata for smaller files
             trim: false, // Don't trim as it might affect positioning
