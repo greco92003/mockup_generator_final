@@ -289,7 +289,7 @@
   <body>
     <div class="main-container">
       <div class="form-container">
-        <form id="mockupForm">
+        <form id="mockupForm" target="_top">
           <div class="form-group">
             <label for="name">Nome Completo:</label>
             <input
@@ -545,8 +545,8 @@
               });
             }
 
-            // Redirecionar imediatamente, sem esperar pelo fetch
-            window.location.href =
+            // Redirecionar imediatamente na janela principal, sem esperar pelo fetch
+            window.top.location.href =
               "https://hudlab.com.br/obrigado-amostra-digital2";
           } catch (error) {
             console.error("Erro ao processar o formulário:", error);
@@ -555,8 +555,8 @@
             );
 
             // Mostrar o erro mas não bloquear o usuário
-            // Redirecionar mesmo em caso de erro
-            window.location.href =
+            // Redirecionar mesmo em caso de erro na janela principal
+            window.top.location.href =
               "https://hudlab.com.br/obrigado-amostra-digital2";
           }
           // Este catch não é mais necessário, pois já temos um catch interno
