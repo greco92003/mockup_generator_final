@@ -50,8 +50,13 @@ async function uploadToS3(fileBuffer, fileName, folder = "logos") {
     console.log("- Location:", result.Location);
     console.log("- Key:", result.Key);
 
+    // Generate pre-signed URL for the uploaded file
+    const presignedUrl = await generatePresignedUrl(result.Key);
+    console.log("- Pre-signed URL:", presignedUrl.substring(0, 100) + "...");
+
     return {
-      url: result.Location,
+      url: presignedUrl, // Return pre-signed URL instead of direct URL
+      directUrl: result.Location, // Also include the direct URL for reference
       key: result.Key,
     };
   } catch (error) {
@@ -108,16 +113,61 @@ async function getPresignedUrlFromS3Url(
     console.log(`Getting pre-signed URL for S3 URL: ${url}`);
 
     // Extract the key from the S3 URL
-    // URL format: https://bucket-name.s3.amazonaws.com/key
+    // URL format could be one of:
+    // 1. https://bucket-name.s3.amazonaws.com/key
+    // 2. https://bucket-name.s3.region.amazonaws.com/key
+    // 3. https://s3.region.amazonaws.com/bucket-name/key
+
     const urlObj = new URL(url);
-    const pathParts = urlObj.pathname
-      .split("/")
-      .filter((part) => part.length > 0);
-    const key = pathParts.join("/");
+    let key = "";
+    let bucket = process.env.S3_BUCKET || "mockup-hudlab";
 
-    console.log(`Extracted key from URL: ${key}`);
+    console.log(
+      `URL hostname: ${urlObj.hostname}, pathname: ${urlObj.pathname}`
+    );
 
-    return await generatePresignedUrl(key, expirationSeconds);
+    if (urlObj.hostname.includes("s3.amazonaws.com")) {
+      // Format: https://bucket-name.s3.amazonaws.com/key or https://bucket-name.s3.region.amazonaws.com/key
+      const pathParts = urlObj.pathname
+        .split("/")
+        .filter((part) => part.length > 0);
+      key = pathParts.join("/");
+
+      // Extract bucket name from hostname if it's in the format bucket-name.s3.region.amazonaws.com
+      if (urlObj.hostname.split(".")[0] !== "s3") {
+        bucket = urlObj.hostname.split(".")[0];
+      }
+    } else if (
+      urlObj.hostname === "s3.amazonaws.com" ||
+      urlObj.hostname.startsWith("s3.")
+    ) {
+      // Format: https://s3.region.amazonaws.com/bucket-name/key
+      const pathParts = urlObj.pathname
+        .split("/")
+        .filter((part) => part.length > 0);
+      bucket = pathParts[0];
+      key = pathParts.slice(1).join("/");
+    }
+
+    console.log(`Extracted bucket: ${bucket}, key: ${key}`);
+
+    // Generate pre-signed URL with explicit bucket and key
+    const params = {
+      Bucket: bucket,
+      Key: key,
+      Expires: expirationSeconds,
+    };
+
+    console.log(
+      `Generating pre-signed URL with params: ${JSON.stringify(params)}`
+    );
+
+    const presignedUrl = await s3.getSignedUrlPromise("getObject", params);
+    console.log(
+      `Pre-signed URL generated: ${presignedUrl.substring(0, 100)}...`
+    );
+
+    return presignedUrl;
   } catch (error) {
     console.error("Error getting pre-signed URL from S3 URL:", error);
     throw error;
