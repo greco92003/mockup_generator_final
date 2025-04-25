@@ -262,6 +262,22 @@
       .logo-requirements li {
         margin-bottom: 3px;
       }
+
+      /* Estilo para o disclaimer */
+      .disclaimer-box {
+        background-color: #fff3cd;
+        border-left: 4px solid #ffc107;
+        color: #856404;
+        padding: 12px 15px;
+        margin: 15px 0;
+        border-radius: 4px;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      .disclaimer-box strong {
+        color: #856404;
+      }
     </style>
   </head>
   <body>
@@ -369,6 +385,15 @@
 
           <!-- Processamento feito pelo AWS Lambda -->
           <input type="hidden" name="processingMethod" value="lambda" />
+
+          <!-- Disclaimer sobre o upload de logo obrigatório -->
+          <div class="disclaimer-box">
+            <p>
+              <strong>Atenção:</strong> O upload do arquivo de logo é
+              obrigatório para a geração do mockup. Por favor, selecione um
+              arquivo PNG, JPG ou PDF antes de enviar o formulário.
+            </p>
+          </div>
 
           <button type="submit" id="submitBtn">Enviar</button>
         </form>
