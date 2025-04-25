@@ -154,8 +154,11 @@
       .error-message {
         color: #e74c3c;
         font-weight: 600;
-        margin-top: 5px;
-        padding: 5px 0;
+        margin-top: 8px;
+        padding: 8px;
+        border-left: 3px solid #e74c3c;
+        background-color: rgba(231, 76, 60, 0.1);
+        border-radius: 3px;
         display: none;
       }
 
@@ -389,6 +392,15 @@
             fileName.textContent = this.files[0].name;
             // Esconder a mensagem de erro se um arquivo for selecionado
             logoError.style.display = "none";
+
+            // Verificar o tipo de arquivo imediatamente
+            const file = this.files[0];
+            const validTypes = ["image/png", "image/jpeg", "application/pdf"];
+            if (!validTypes.includes(file.type)) {
+              logoError.textContent =
+                "Por favor, selecione um arquivo PNG, JPG ou PDF.";
+              logoError.style.display = "block";
+            }
           } else {
             fileName.textContent = "Nenhum arquivo selecionado";
           }
@@ -416,12 +428,13 @@
             return;
           }
 
-          // Validate logo file
+          // Validate logo file - Abordagem direta
           const logoFile = document.getElementById("logo").files[0];
           if (!logoFile) {
             logoError.textContent =
-              "Envio de arquivo obrigatório. Por favor, selecione um arquivo PNG, JPG ou PDF.";
+              "Por favor, selecione um arquivo antes de enviar.";
             logoError.style.display = "block";
+            fileInput.focus(); // Dá foco ao input para melhor acessibilidade
             return;
           }
 
