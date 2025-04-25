@@ -142,8 +142,11 @@ async function pdfBufferToPng(buffer, filename = "logo.pdf") {
           convert_logo: {
             operation: "convert",
             input: "upload_logo",
+            input_format: "pdf",
             output_format: "png",
-            density: 300, // Pixel Density: 300 DPI for better quality
+            pixel_density: 72,
+            width: 326,
+            height: 200,
             alpha: true, // Alpha: Yes - Render pages with an alpha channel and transparent background
             filename: filename.replace(/\.pdf$/i, ".png"),
           },
