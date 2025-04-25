@@ -748,6 +748,77 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
   }
 });
 
+// Endpoint to check all custom fields in ActiveCampaign
+app.get("/api/check-custom-fields", async (req, res) => {
+  try {
+    console.log(
+      "Verificando todos os campos personalizados no ActiveCampaign..."
+    );
+
+    // Make a direct API call to get all custom fields
+    const response = await fetch(
+      `${process.env.ACTIVE_CAMPAIGN_URL}/api/3/fields`,
+      {
+        method: "GET",
+        headers: {
+          "Api-Token": process.env.ACTIVE_CAMPAIGN_API_KEY,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+      }
+    );
+
+    const data = await response.json();
+
+    if (data.fields) {
+      console.log(`Encontrados ${data.fields.length} campos personalizados`);
+
+      // Look for mockup_logotipo field
+      const mockupLogotipoField = data.fields.find(
+        (field) => field.title === "mockup_logotipo"
+      );
+
+      if (mockupLogotipoField) {
+        console.log(
+          `Campo mockup_logotipo encontrado: ID: ${mockupLogotipoField.id}`
+        );
+      } else {
+        console.log("Campo mockup_logotipo não encontrado");
+      }
+
+      // Look for mockup_url field
+      const mockupUrlField = data.fields.find(
+        (field) => field.title === "mockup_url"
+      );
+
+      if (mockupUrlField) {
+        console.log(`Campo mockup_url encontrado: ID: ${mockupUrlField.id}`);
+      } else {
+        console.log("Campo mockup_url não encontrado");
+      }
+
+      return res.json({
+        success: true,
+        fields: data.fields,
+        mockupLogotipoField,
+        mockupUrlField,
+      });
+    } else {
+      return res.status(500).json({
+        error: "Failed to get custom fields",
+        message: "API call was successful but no fields were returned",
+        apiResponse: data,
+      });
+    }
+  } catch (error) {
+    console.error("Error checking custom fields:", error);
+    return res.status(500).json({
+      error: "Failed to check custom fields",
+      message: error.message,
+    });
+  }
+});
+
 // Endpoint to check contact fields in ActiveCampaign
 app.get("/api/check-contact-fields", async (req, res) => {
   try {
