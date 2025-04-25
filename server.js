@@ -44,10 +44,13 @@ async function pdfBufferToPng(buffer, filename = "logo.pdf") {
         convert_logo: {
           operation: "convert",
           input: "upload_logo",
+          input_format: "pdf",
           output_format: "png",
           pages: "1", // first page only
+          pixel_density: 72,
+          width: 326,
+          height: 200,
           alpha: true, // Render with transparent background
-          density: 300, // Higher quality
           filename: filename.replace(/\.pdf$/i, ".png"),
         },
         export_logo: { operation: "export/url", input: "convert_logo" },

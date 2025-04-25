@@ -77,10 +77,13 @@ class PdfConverter {
           convert_logo: {
             operation: "convert",
             input: "upload_logo",
+            input_format: "pdf",
             output_format: "png",
             engine: "graphicsmagick", // Faster engine
             engine_version: "1.3.36",
-            density: 300, // DPI for quality
+            pixel_density: 72,
+            width: 326,
+            height: 200,
             alpha: true, // Transparent background
             strip: true, // Strip metadata for smaller files
             trim: false, // Don't trim as it might affect positioning
