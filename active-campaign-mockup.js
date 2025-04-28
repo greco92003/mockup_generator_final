@@ -8,7 +8,7 @@ const CloudConvert = require("cloudconvert");
 const https = require("https");
 const { v4: uuidv4 } = require("uuid");
 const activeCampaign = require("./active-campaign-api");
-const supabaseStorage = require("./supabase-storage");
+const s3Storage = require("./s3-storage");
 const awsLambdaConfig = require("./aws-lambda-config");
 const s3Upload = require("./s3-upload");
 const asyncProcessor = require("./async-processor");
@@ -423,11 +423,11 @@ async function generateMockup(logoPath, options = {}) {
   }
 }
 
-// Save mockup to Supabase Storage or local directory and return URL
+// Save mockup to S3 Storage or local directory and return URL
 async function saveMockupToPublic(mockupPath, email) {
   try {
-    // Use the Supabase storage module to save the mockup
-    return await supabaseStorage.saveMockup(mockupPath, email);
+    // Use the S3 storage module to save the mockup
+    return await s3Storage.saveMockup(mockupPath, email);
   } catch (error) {
     console.error("Error saving mockup:", error);
     throw error;
@@ -1184,8 +1184,6 @@ app.get("/api/diagnostics", (req, res) => {
       WHATSAPP_REDIRECT_URL: process.env.WHATSAPP_REDIRECT_URL
         ? "✓ Set"
         : "✗ Not set",
-      SUPABASE_URL: process.env.SUPABASE_URL ? "✓ Set" : "✗ Not set",
-      SUPABASE_KEY: process.env.SUPABASE_KEY ? "✓ Set" : "✗ Not set",
     };
 
     // System info
