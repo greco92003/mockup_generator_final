@@ -49,11 +49,12 @@ async function uploadToS3(
     );
     console.log(`Is uncompressed original: ${isUncompressed}`);
 
-    // If this is an uncompressed original file, always use the logo-uncompressed folder
-    // regardless of the folder parameter
-    if (isUncompressed) {
+    // Se o arquivo for marcado como não comprimido original ou se a pasta já for logo-uncompressed
+    if (isUncompressed && folder !== "logo-uncompressed") {
       folder = "logo-uncompressed";
       console.log(`Using logo-uncompressed folder for original file`);
+    } else if (folder === "logo-uncompressed") {
+      console.log(`Folder already set to logo-uncompressed, keeping it`);
     }
 
     // Generate a unique ID for the file

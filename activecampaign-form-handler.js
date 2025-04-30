@@ -64,48 +64,75 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
     const logoFilename = req.file.originalname;
     const mime = req.file.mimetype;
 
-    // Upload original logo to S3 in logo-uncompressed folder
-    console.log("Uploading original logo to S3 in logo-uncompressed folder...");
-    const originalUploadResult = await s3Upload.uploadToS3(
-      logoBuffer,
-      logoFilename,
-      "logos",
-      true // Mark as uncompressed original
-    );
-
-    // Get the original logo URL (this will be sent to mockup_logotipo field)
-    const originalLogoUrl = originalUploadResult.url;
-    console.log(
-      `Original logo uploaded to S3 in logo-uncompressed folder: ${originalLogoUrl}`
-    );
-    console.log(`Folder: ${originalUploadResult.folder}`);
-
+    let originalLogoUrl;
     let logoUrl;
 
-    // For all file types, we need to have a copy in the logos folder for processing
-    // For PDF files, Lambda will handle the conversion from PDF to PNG
     if (mime === "application/pdf") {
+      // Para arquivos PDF:
+      // 1. Fazer upload apenas para a pasta logo-uncompressed
+      // 2. Não fazer upload duplicado para a pasta logos
+      // 3. O Lambda irá converter o PDF para PNG e salvar na pasta logos
+
       console.log(
-        "PDF file detected. Lambda will convert it to PNG during processing."
+        "PDF file detected. Uploading to logo-uncompressed folder only..."
       );
 
-      // For PDF files, we'll use the original URL from logo-uncompressed folder
-      // The Lambda function will download it, convert it to PNG, and save the PNG to logos folder
+      // Upload do PDF original para a pasta logo-uncompressed
+      const originalUploadResult = await s3Upload.uploadToS3(
+        logoBuffer,
+        logoFilename,
+        "logo-uncompressed", // Especificar diretamente a pasta logo-uncompressed
+        true // Marcar como arquivo original não comprimido
+      );
+
+      // Obter a URL do PDF original (será enviada para o campo mockup_logotipo)
+      originalLogoUrl = originalUploadResult.url;
+      console.log(
+        `Original PDF uploaded to S3 in logo-uncompressed folder: ${originalLogoUrl}`
+      );
+      console.log(`Folder: ${originalUploadResult.folder}`);
+
+      // Para PDFs, usamos a URL original da pasta logo-uncompressed para processamento
+      // O Lambda irá baixar, converter para PNG e salvar o PNG na pasta logos
       logoUrl = originalLogoUrl;
       console.log(`Using original PDF URL for Lambda processing: ${logoUrl}`);
+      console.log("Lambda will convert PDF to PNG and save to logos folder");
     } else {
-      // For non-PDF files (PNG, JPG), upload directly to logos folder for processing
-      console.log("Uploading logo to S3 logos folder for processing...");
+      // Para arquivos PNG/JPG:
+      // 1. Fazer upload do original para a pasta logo-uncompressed
+      // 2. Fazer upload de uma cópia para a pasta logos para processamento
+
+      console.log(
+        "PNG/JPG file detected. Uploading to both logo-uncompressed and logos folders..."
+      );
+
+      // Upload do arquivo original para a pasta logo-uncompressed
+      const originalUploadResult = await s3Upload.uploadToS3(
+        logoBuffer,
+        logoFilename,
+        "logo-uncompressed", // Especificar diretamente a pasta logo-uncompressed
+        true // Marcar como arquivo original não comprimido
+      );
+
+      // Obter a URL do arquivo original (será enviada para o campo mockup_logotipo)
+      originalLogoUrl = originalUploadResult.url;
+      console.log(
+        `Original image uploaded to S3 in logo-uncompressed folder: ${originalLogoUrl}`
+      );
+      console.log(`Folder: ${originalUploadResult.folder}`);
+
+      // Upload de uma cópia para a pasta logos para processamento
+      console.log("Uploading copy to logos folder for processing...");
       const logoUploadResult = await s3Upload.uploadToS3(
         logoBuffer,
         logoFilename,
-        "logos",
-        false // Not marked as uncompressed original
+        "logos", // Pasta logos para processamento
+        false // Não marcar como arquivo original não comprimido
       );
 
-      // Get the logo URL for mockup generation
+      // Obter a URL da cópia para geração do mockup
       logoUrl = logoUploadResult.url;
-      console.log(`Logo uploaded to S3 logos folder: ${logoUrl}`);
+      console.log(`Copy uploaded to S3 logos folder: ${logoUrl}`);
       console.log(`Folder: ${logoUploadResult.folder}`);
     }
 
