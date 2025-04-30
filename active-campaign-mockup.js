@@ -804,22 +804,13 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
       console.log(`Total processing time: ${totalTime}ms`);
     }
 
-    // Process lead information with logo URL synchronously
-    console.log("Processing lead information with logo URL synchronously...");
+    // Process lead information with logo URL
+    console.log("Processing lead information with logo URL...");
     console.log("Logo URL to use:", logoUrl);
-    try {
-      await activeCampaign.processLeadBasicInfo({
-        email,
-        name,
-        phone,
-        segmento,
-        logo_url: logoUrl,
-      });
-      console.log("Lead information processed successfully");
-    } catch (error) {
-      console.error("Error processing lead information:", error);
-      // Continue with the process even if this update fails
-    }
+    asyncProcessor.processLeadBasicInfoAsync(
+      { email, name, phone, segmento },
+      logoUrl
+    );
 
     // Update mockup URL in ActiveCampaign asynchronously if available
     if (mockupUrl) {
@@ -1230,83 +1221,6 @@ app.post("/api/update-mockup-field-direct", async (req, res) => {
     console.error("Error updating mockup_url field directly:", error);
     return res.status(500).json({
       error: "Failed to update mockup_url field",
-      message: error.message,
-    });
-  }
-});
-
-// Endpoint to test contact creation directly
-app.post("/api/test-contact-creation", async (req, res) => {
-  try {
-    const { email, name, phone, segmento } = req.body;
-
-    if (!email || !name) {
-      return res.status(400).json({
-        error: "Missing required parameters",
-        message: "Email and name are required",
-      });
-    }
-
-    console.log(`Testing direct contact creation for ${email}`);
-
-    // Split name into first and last name
-    let firstName = name;
-    let lastName = "";
-
-    if (name && name.includes(" ")) {
-      const nameParts = name.split(" ");
-      firstName = nameParts[0];
-      lastName = nameParts.slice(1).join(" ");
-    }
-
-    // Try to create contact directly
-    try {
-      const contact = await activeCampaign.createContact({
-        email,
-        firstName,
-        lastName,
-        phone,
-      });
-
-      console.log(`Contact created successfully: ${contact.id}`);
-
-      // If segmento is provided, update the field
-      if (segmento) {
-        try {
-          // Find or create segmento custom field
-          const segmentoField = await activeCampaign.createOrUpdateCustomField(
-            "Segmento de Negócio",
-            "DROPDOWN"
-          );
-
-          // Update custom field with segmento value
-          await activeCampaign.updateContactCustomField(
-            contact.id,
-            segmentoField.id,
-            segmento
-          );
-          console.log("Segmento field updated successfully");
-        } catch (segmentoError) {
-          console.error("Error updating segmento field:", segmentoError);
-        }
-      }
-
-      return res.json({
-        success: true,
-        message: "Contact created successfully",
-        contact,
-      });
-    } catch (createError) {
-      console.error("Error creating contact:", createError);
-      return res.status(500).json({
-        error: "Failed to create contact",
-        message: createError.message,
-      });
-    }
-  } catch (error) {
-    console.error("Error in test contact creation:", error);
-    return res.status(500).json({
-      error: "Failed to test contact creation",
       message: error.message,
     });
   }
