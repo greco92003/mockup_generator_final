@@ -514,20 +514,24 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
       let originalUploadResult = null;
 
       try {
-        // Upload the original PDF to S3
-        console.log("Uploading original PDF to S3...");
+        // Upload the original PDF to S3 in the logo-uncompressed folder
+        console.log(
+          "Uploading original PDF to S3 in logo-uncompressed folder..."
+        );
         console.log(`File to upload: ${logoFilename}, MIME type: ${mime}`);
         console.log(`File size: ${logoBuffer.length} bytes`);
 
-        // Upload the original PDF
+        // Upload the original PDF with isUncompressed=true to store in logo-uncompressed folder
         originalUploadResult = await s3Upload.uploadToS3(
           logoBuffer,
           logoFilename,
-          "logos"
+          "logos",
+          true // Mark as uncompressed original
         );
 
         originalPdfUrl = originalUploadResult.url;
         console.log(`Original PDF uploaded to S3: ${originalPdfUrl}`);
+        console.log(`Folder: ${originalUploadResult.folder}`);
         console.log(
           `Original S3 upload result: ${JSON.stringify(originalUploadResult)}`
         );
@@ -651,39 +655,38 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
         "Armazenando URL do logotipo original no campo mockup_logotipo (do cache)..."
       );
       try {
-        // Check if this is a PNG or PDF file (we want to ensure it's uncompressed)
-        if (mime === "image/png" || mime === "application/pdf") {
-          console.log(
-            `${
-              mime === "image/png" ? "PNG" : "PDF"
-            } file detected - ensuring original uncompressed URL is used for mockup_logotipo field (from cache)`
+        // For cached files, we need to modify the URL to point to the logo-uncompressed folder
+        // Since we're using the same file ID for both folders, we can just replace the folder name
+        let originalLogoUrl = logoUrl;
+
+        // First, remove any query parameters if present
+        if (originalLogoUrl.includes("?")) {
+          originalLogoUrl = originalLogoUrl.split("?")[0];
+        }
+
+        // Replace the 'logos' folder with 'logo-uncompressed' in the URL
+        if (originalLogoUrl.includes("/logos/")) {
+          originalLogoUrl = originalLogoUrl.replace(
+            "/logos/",
+            "/logo-uncompressed/"
           );
-
-          // For cached files, we need to extract the direct URL from the cached logoUrl
-          // This is a bit tricky since we don't have the original upload result
-          // Let's try to get the direct URL by removing any query parameters
-          let originalLogoUrl = logoUrl;
-          if (logoUrl.includes("?")) {
-            originalLogoUrl = logoUrl.split("?")[0];
-            console.log(
-              `Extracted original URL from cached URL: ${originalLogoUrl}`
-            );
-          }
-
-          // Use the dedicated function to update the logo URL with the original uncompressed URL
-          await activeCampaign.updateLeadLogoUrl(email, originalLogoUrl);
           console.log(
-            `Campo mockup_logotipo atualizado com sucesso com URL original não comprimida do ${
-              mime === "image/png" ? "PNG" : "PDF"
-            } (do cache)`
+            `Modified URL to point to logo-uncompressed folder: ${originalLogoUrl}`
           );
         } else {
-          // For other file types, use the standard URL
-          await activeCampaign.updateLeadLogoUrl(email, logoUrl);
           console.log(
-            "Campo mockup_logotipo atualizado com sucesso (do cache)"
+            `Could not modify URL to point to logo-uncompressed folder, using original: ${originalLogoUrl}`
           );
         }
+
+        // Use the dedicated function to update the logo URL with the URL pointing to logo-uncompressed
+        console.log(
+          `Updating mockup_logotipo field with URL from logo-uncompressed folder: ${originalLogoUrl}`
+        );
+        await activeCampaign.updateLeadLogoUrl(email, originalLogoUrl);
+        console.log(
+          "Campo mockup_logotipo atualizado com sucesso com URL do arquivo original não comprimido (do cache)"
+        );
       } catch (logoUrlError) {
         console.error(
           "Erro ao atualizar campo mockup_logotipo no ActiveCampaign (do cache):",
@@ -698,8 +701,10 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
       // Use parallel processing for S3 upload and mockup generation
       console.log("Starting parallel processing...");
 
-      // Upload logo to S3
-      console.log("Uploading logo to S3...");
+      // First, upload the original uncompressed file to logo-uncompressed folder
+      console.log(
+        "Uploading original logo to S3 in logo-uncompressed folder..."
+      );
       console.log(`File to upload: ${logoFilename}, MIME type: ${mime}`);
       console.log(`File size: ${logoBuffer.length} bytes`);
 
@@ -713,37 +718,54 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
         logoFilename = `${logoFilename}.jpg`;
       }
 
-      const uploadPromise = s3Upload.uploadToS3(
+      // Upload the original uncompressed file
+      const originalUploadResult = await s3Upload.uploadToS3(
         logoBuffer,
         logoFilename,
-        "logos"
+        "logos",
+        true // Mark as uncompressed original
       );
 
-      // Start upload and continue with other processing
-      const uploadResult = await uploadPromise;
+      const originalLogoUrl = originalUploadResult.url;
+      console.log(`Original logo uploaded to S3: ${originalLogoUrl}`);
+      console.log(`Folder: ${originalUploadResult.folder}`);
+      console.log(
+        `Original S3 upload result: ${JSON.stringify(originalUploadResult)}`
+      );
+
+      // Now upload the same file to the logos folder for processing
+      console.log("Uploading logo to S3 logos folder for processing...");
+      const uploadResult = await s3Upload.uploadToS3(
+        logoBuffer,
+        logoFilename,
+        "logos",
+        false // Not marked as uncompressed original
+      );
+
       logoUrl = uploadResult.url;
-      console.log(`Logo uploaded to S3: ${logoUrl}`);
+      console.log(`Logo uploaded to S3 logos folder: ${logoUrl}`);
+      console.log(`Folder: ${uploadResult.folder}`);
       console.log(`S3 upload result: ${JSON.stringify(uploadResult)}`);
 
-      // Store the original logo URL in ActiveCampaign
+      // Store the original uncompressed logo URL in ActiveCampaign
       console.log(
         "Armazenando URL do logotipo original no campo mockup_logotipo..."
       );
       try {
-        // For all file types, ensure we're using the direct URL without query parameters
-        let originalLogoUrl = logoUrl;
+        // Use the original uncompressed URL from the logo-uncompressed folder
+        let uncompressedLogoUrl = originalLogoUrl;
 
         // If the URL contains query parameters (pre-signed URL), remove them
-        if (originalLogoUrl.includes("?")) {
-          originalLogoUrl = originalLogoUrl.split("?")[0];
+        if (uncompressedLogoUrl.includes("?")) {
+          uncompressedLogoUrl = uncompressedLogoUrl.split("?")[0];
           console.log("Converting to direct URL for mockup_logotipo field:");
-          console.log("Original URL:", logoUrl);
-          console.log("Direct URL:", originalLogoUrl);
+          console.log("Original URL:", originalLogoUrl);
+          console.log("Direct URL:", uncompressedLogoUrl);
         }
 
-        // Use the dedicated function to update the logo URL with the direct URL
+        // Use the dedicated function to update the logo URL with the direct URL from logo-uncompressed folder
         console.log(
-          `Updating mockup_logotipo field with direct URL: ${originalLogoUrl}`
+          `Updating mockup_logotipo field with uncompressed URL from logo-uncompressed folder: ${uncompressedLogoUrl}`
         );
 
         // Make multiple attempts to update the field if needed
@@ -756,9 +778,9 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
           console.log(`Attempt ${attempts} to update mockup_logotipo field...`);
 
           try {
-            await activeCampaign.updateLeadLogoUrl(email, originalLogoUrl);
+            await activeCampaign.updateLeadLogoUrl(email, uncompressedLogoUrl);
             console.log(
-              "Campo mockup_logotipo atualizado com sucesso com URL direta"
+              "Campo mockup_logotipo atualizado com sucesso com URL do arquivo original não comprimido"
             );
             updateSuccess = true;
           } catch (attemptError) {

@@ -23,9 +23,15 @@ const DEFAULT_EXPIRATION = 7 * 24 * 60 * 60;
  * @param {Buffer} fileBuffer - File buffer to upload
  * @param {string} fileName - Original file name
  * @param {string} folder - Folder to upload to
+ * @param {boolean} isUncompressed - Whether this is an uncompressed original file
  * @returns {Promise<object>} - S3 upload result with URL
  */
-async function uploadToS3(fileBuffer, fileName, folder = "logos") {
+async function uploadToS3(
+  fileBuffer,
+  fileName,
+  folder = "logos",
+  isUncompressed = false
+) {
   try {
     console.log(`Uploading file to S3: ${fileName}`);
     console.log(`File extension: ${fileName.split(".").pop().toLowerCase()}`);
@@ -41,6 +47,13 @@ async function uploadToS3(fileBuffer, fileName, folder = "logos") {
           : "Unknown"
       }`
     );
+    console.log(`Is uncompressed original: ${isUncompressed}`);
+
+    // If this is an uncompressed original file, use the logo-uncompressed folder
+    if (isUncompressed && folder === "logos") {
+      folder = "logo-uncompressed";
+      console.log(`Using logo-uncompressed folder for original file`);
+    }
 
     // Generate a unique ID for the file
     const fileId = uuidv4();
@@ -73,15 +86,18 @@ async function uploadToS3(fileBuffer, fileName, folder = "logos") {
     };
 
     // For PNG and PDF files, ensure no compression is applied
-    if (fileExtension === "png" || fileExtension === "pdf") {
+    if (fileExtension === "png" || fileExtension === "pdf" || isUncompressed) {
       console.log(
-        `${fileExtension.toUpperCase()} file detected - ensuring no compression is applied`
+        `${
+          isUncompressed ? "Original uncompressed" : fileExtension.toUpperCase()
+        } file detected - ensuring no compression is applied`
       );
       // Add metadata to indicate this is an uncompressed file
       params.Metadata = {
         uncompressed: "true",
         "original-filename": fileName,
         "file-type": fileExtension,
+        "is-original": isUncompressed ? "true" : "false",
       };
     }
 
@@ -91,6 +107,7 @@ async function uploadToS3(fileBuffer, fileName, folder = "logos") {
     - Key: ${params.Key}
     - ContentType: ${params.ContentType}
     - File size: ${fileBuffer.length} bytes
+    - Folder: ${folder}
     - Metadata: ${params.Metadata ? JSON.stringify(params.Metadata) : "None"}`);
 
     // Upload to S3
@@ -99,6 +116,7 @@ async function uploadToS3(fileBuffer, fileName, folder = "logos") {
     console.log("File uploaded to S3:");
     console.log("- Location:", result.Location);
     console.log("- Key:", result.Key);
+    console.log("- Folder:", folder);
 
     // Since the bucket is now public, we'll use direct URLs instead of pre-signed URLs
     console.log("- Direct URL:", result.Location);
@@ -111,8 +129,9 @@ async function uploadToS3(fileBuffer, fileName, folder = "logos") {
       contentType: contentType,
       fileExtension: fileExtension,
       isOriginalUncompressed:
-        fileExtension === "png" || fileExtension === "pdf", // Flag to indicate if this is an uncompressed original
+        isUncompressed || fileExtension === "png" || fileExtension === "pdf", // Flag to indicate if this is an uncompressed original
       originalFileName: fileName,
+      folder: folder,
     };
 
     console.log(`S3 upload result: ${JSON.stringify(uploadResult, null, 2)}`);

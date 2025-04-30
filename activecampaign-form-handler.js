@@ -64,17 +64,35 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
     const logoFilename = req.file.originalname;
     const mime = req.file.mimetype;
 
-    // Upload original logo to S3 (without processing)
-    console.log("Uploading original logo to S3...");
+    // Upload original logo to S3 in logo-uncompressed folder
+    console.log("Uploading original logo to S3 in logo-uncompressed folder...");
+    const originalUploadResult = await s3Upload.uploadToS3(
+      logoBuffer,
+      logoFilename,
+      "logos",
+      true // Mark as uncompressed original
+    );
+
+    // Get the original logo URL (this will be sent to mockup_logotipo field)
+    const originalLogoUrl = originalUploadResult.url;
+    console.log(
+      `Original logo uploaded to S3 in logo-uncompressed folder: ${originalLogoUrl}`
+    );
+    console.log(`Folder: ${originalUploadResult.folder}`);
+
+    // Upload the same file to logos folder for processing
+    console.log("Uploading logo to S3 logos folder for processing...");
     const logoUploadResult = await s3Upload.uploadToS3(
       logoBuffer,
       logoFilename,
-      "logos"
+      "logos",
+      false // Not marked as uncompressed original
     );
 
-    // Get the logo URL (this will be sent to mockup_logotipo field)
+    // Get the logo URL for mockup generation
     const logoUrl = logoUploadResult.url;
-    console.log(`Original logo uploaded to S3: ${logoUrl}`);
+    console.log(`Logo uploaded to S3 logos folder: ${logoUrl}`);
+    console.log(`Folder: ${logoUploadResult.folder}`);
 
     // Process the logo to generate mockup using AWS Lambda
     console.log("Generating mockup with AWS Lambda...");
@@ -94,15 +112,16 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
       mockupUrl = awsLambdaConfig.generateFallbackMockupUrl(email);
     }
 
-    // Return both URLs to the client
+    // Return all URLs to the client
     res.json({
       success: true,
       name,
       email,
       phone,
       segmento,
-      logoUrl: logoUrl,
-      url: mockupUrl,
+      logoUrl: logoUrl, // URL for the processed logo in logos folder
+      originalLogoUrl: originalLogoUrl, // URL for the original uncompressed logo in logo-uncompressed folder
+      url: mockupUrl, // URL for the generated mockup
       redirect_url: WHATSAPP_REDIRECT_URL,
     });
 
@@ -121,18 +140,28 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
       asyncProcessor.updateMockupUrlAsync(email, mockupUrl);
     }
 
-    if (logoUrl) {
-      console.log("Updating logo URL in ActiveCampaign asynchronously...");
+    if (originalLogoUrl) {
+      console.log(
+        "Updating logo URL in ActiveCampaign asynchronously with original uncompressed URL..."
+      );
       asyncProcessor.addTask(
         async (data) => {
           try {
-            await activeCampaign.updateLeadLogoUrl(data.email, data.logoUrl);
-            console.log("Logo URL updated successfully in ActiveCampaign");
+            await activeCampaign.updateLeadLogoUrl(
+              data.email,
+              data.originalLogoUrl
+            );
+            console.log(
+              "Original uncompressed logo URL updated successfully in ActiveCampaign (mockup_logotipo field)"
+            );
           } catch (error) {
-            console.error("Error updating logo URL in ActiveCampaign:", error);
+            console.error(
+              "Error updating original logo URL in ActiveCampaign:",
+              error
+            );
           }
         },
-        { email, logoUrl }
+        { email, originalLogoUrl }
       );
     }
   } catch (error) {
