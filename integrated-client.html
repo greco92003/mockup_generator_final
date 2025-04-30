@@ -467,7 +467,13 @@
           loadingIndicator.style.display = "block";
 
           try {
-            // Primeiro, enviar o arquivo para o servidor
+            // Enviar o formulário para o ActiveCampaign imediatamente
+            console.log("Enviando dados para o ActiveCampaign...");
+
+            // Usar o método tradicional de envio de formulário para o ActiveCampaign
+            form.submit();
+
+            // Iniciar o upload do arquivo em paralelo (não esperamos pela resposta)
             const formData = new FormData();
             formData.append("name", document.getElementById("fullname").value);
             formData.append("email", email);
@@ -478,54 +484,31 @@
             );
             formData.append("logo", logoFile);
 
-            // Enviar o arquivo para o servidor
-            const response = await fetch("/api/mockup", {
+            // Enviar o arquivo para o servidor de forma assíncrona
+            fetch("/api/mockup", {
               method: "POST",
               body: formData,
-            });
-
-            if (!response.ok) {
-              throw new Error("Erro ao processar o arquivo");
-            }
-
-            const data = await response.json();
-            console.log("Resposta do servidor:", data);
-
-            // Preencher os campos ocultos com as URLs diretas
-            if (data.url) {
-              // Ensure we're using a direct URL without query parameters
-              let directUrl = data.url;
-              if (directUrl.includes("?")) {
-                directUrl = directUrl.split("?")[0];
-                console.log("Converting to direct URL for mockup_url field:");
-                console.log("Original URL:", data.url);
-                console.log("Direct URL:", directUrl);
-              }
-              document.getElementById("mockup_url").value = directUrl;
-            }
-
-            if (data.logoUrl) {
-              // Ensure we're using a direct URL without query parameters
-              let directLogoUrl = data.logoUrl;
-              if (directLogoUrl.includes("?")) {
-                directLogoUrl = directLogoUrl.split("?")[0];
-                console.log(
-                  "Converting to direct URL for mockup_logotipo field:"
+            })
+              .then((response) => {
+                if (response.ok) {
+                  console.log(
+                    "Arquivo enviado com sucesso para processamento assíncrono"
+                  );
+                } else {
+                  console.error(
+                    "Erro ao enviar arquivo para processamento assíncrono"
+                  );
+                }
+              })
+              .catch((error) => {
+                console.error(
+                  "Erro na requisição de processamento assíncrono:",
+                  error
                 );
-                console.log("Original URL:", data.logoUrl);
-                console.log("Direct URL:", directLogoUrl);
-              }
-              document.getElementById("mockup_logotipo").value = directLogoUrl;
-            }
+              });
 
-            // Agora enviar o formulário para o ActiveCampaign
-            console.log("Enviando dados para o ActiveCampaign...");
-
-            // Usar o método tradicional de envio de formulário para o ActiveCampaign
-            form.submit();
-
-            // Redirecionar para a página de agradecimento após envio
-            // Isso será tratado pelo ActiveCampaign após o processamento do formulário
+            // Não precisamos esperar pela resposta, pois o formulário já foi enviado
+            // e os campos serão atualizados de forma assíncrona no ActiveCampaign
           } catch (error) {
             console.error("Erro ao processar o formulário:", error);
             alert(
