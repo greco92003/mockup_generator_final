@@ -82,15 +82,17 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
 
     let logoUrl;
 
-    // For PDF files, we need to convert to PNG before uploading to logos folder
+    // For all file types, we need to have a copy in the logos folder for processing
+    // For PDF files, Lambda will handle the conversion from PDF to PNG
     if (mime === "application/pdf") {
       console.log(
-        "PDF file detected. Will convert to PNG before uploading to logos folder"
+        "PDF file detected. Lambda will convert it to PNG during processing."
       );
 
-      // We'll handle the conversion and upload to logos folder in the Lambda function
-      // Just use the original URL for now, Lambda will handle the conversion
+      // For PDF files, we'll use the original URL from logo-uncompressed folder
+      // The Lambda function will download it, convert it to PNG, and save the PNG to logos folder
       logoUrl = originalLogoUrl;
+      console.log(`Using original PDF URL for Lambda processing: ${logoUrl}`);
     } else {
       // For non-PDF files (PNG, JPG), upload directly to logos folder for processing
       console.log("Uploading logo to S3 logos folder for processing...");

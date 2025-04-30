@@ -49,8 +49,9 @@ async function uploadToS3(
     );
     console.log(`Is uncompressed original: ${isUncompressed}`);
 
-    // If this is an uncompressed original file, use the logo-uncompressed folder
-    if (isUncompressed && folder === "logos") {
+    // If this is an uncompressed original file, always use the logo-uncompressed folder
+    // regardless of the folder parameter
+    if (isUncompressed) {
       folder = "logo-uncompressed";
       console.log(`Using logo-uncompressed folder for original file`);
     }

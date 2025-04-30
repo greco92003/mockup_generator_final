@@ -525,7 +525,7 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
         originalUploadResult = await s3Upload.uploadToS3(
           logoBuffer,
           logoFilename,
-          "logos",
+          "logo-uncompressed", // Explicitly use logo-uncompressed folder
           true // Mark as uncompressed original
         );
 
@@ -722,7 +722,7 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
       const originalUploadResult = await s3Upload.uploadToS3(
         logoBuffer,
         logoFilename,
-        "logos",
+        "logo-uncompressed", // Explicitly use logo-uncompressed folder
         true // Mark as uncompressed original
       );
 
