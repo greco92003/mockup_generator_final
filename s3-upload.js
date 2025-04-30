@@ -72,13 +72,16 @@ async function uploadToS3(fileBuffer, fileName, folder = "logos") {
       // ACL removed as the bucket does not support ACLs
     };
 
-    // For PNG files, ensure no compression is applied
-    if (fileExtension === "png") {
-      console.log("PNG file detected - ensuring no compression is applied");
-      // Add metadata to indicate this is an uncompressed PNG
+    // For PNG and PDF files, ensure no compression is applied
+    if (fileExtension === "png" || fileExtension === "pdf") {
+      console.log(
+        `${fileExtension.toUpperCase()} file detected - ensuring no compression is applied`
+      );
+      // Add metadata to indicate this is an uncompressed file
       params.Metadata = {
         uncompressed: "true",
         "original-filename": fileName,
+        "file-type": fileExtension,
       };
     }
 

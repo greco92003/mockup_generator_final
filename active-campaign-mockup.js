@@ -483,8 +483,64 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
     let logoBuffer = req.file.buffer;
     let logoFilename = req.file.originalname;
 
-    // If the file is a PDF, convert it to PNG using optimized converter with caching
+    // If the file is a PDF, first upload the original PDF to S3, then convert it to PNG
     if (mime === "application/pdf") {
+      console.log("Processing PDF file...");
+
+      // First, upload the original PDF to S3 to store the uncompressed version
+      console.log("Uploading original PDF to S3 before conversion...");
+      let originalPdfUrl = null;
+      let originalUploadResult = null;
+
+      try {
+        // Upload the original PDF to S3
+        console.log("Uploading original PDF to S3...");
+        console.log(`File to upload: ${logoFilename}, MIME type: ${mime}`);
+        console.log(`File size: ${logoBuffer.length} bytes`);
+
+        // Upload the original PDF
+        originalUploadResult = await s3Upload.uploadToS3(
+          logoBuffer,
+          logoFilename,
+          "logos"
+        );
+
+        originalPdfUrl = originalUploadResult.url;
+        console.log(`Original PDF uploaded to S3: ${originalPdfUrl}`);
+        console.log(
+          `Original S3 upload result: ${JSON.stringify(originalUploadResult)}`
+        );
+
+        // Store the original PDF URL in ActiveCampaign
+        console.log(
+          "Armazenando URL do PDF original no campo mockup_logotipo..."
+        );
+        try {
+          // Use the direct URL from the upload result to ensure it's uncompressed
+          const originalDirectUrl =
+            originalUploadResult.directUrl || originalPdfUrl;
+          console.log(
+            `Using original uncompressed PDF URL: ${originalDirectUrl}`
+          );
+
+          // Update the mockup_logotipo field with the original PDF URL
+          await activeCampaign.updateLeadLogoUrl(email, originalDirectUrl);
+          console.log(
+            "Campo mockup_logotipo atualizado com sucesso com URL do PDF original"
+          );
+        } catch (logoUrlError) {
+          console.error(
+            "Erro ao atualizar campo mockup_logotipo no ActiveCampaign com PDF original:",
+            logoUrlError
+          );
+          // Continue with the process even if this update fails
+        }
+      } catch (pdfUploadError) {
+        console.error("Error uploading original PDF to S3:", pdfUploadError);
+        // Continue with the conversion process even if the original upload fails
+      }
+
+      // Now proceed with the PDF to PNG conversion
       console.log(
         "Converting PDF to PNG using optimized converter with caching..."
       );
@@ -574,13 +630,15 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
         "Armazenando URL do logotipo original no campo mockup_logotipo (do cache)..."
       );
       try {
-        // Check if this is a PNG file (we want to ensure it's uncompressed)
-        if (mime === "image/png") {
+        // Check if this is a PNG or PDF file (we want to ensure it's uncompressed)
+        if (mime === "image/png" || mime === "application/pdf") {
           console.log(
-            "PNG file detected - ensuring original uncompressed URL is used for mockup_logotipo field (from cache)"
+            `${
+              mime === "image/png" ? "PNG" : "PDF"
+            } file detected - ensuring original uncompressed URL is used for mockup_logotipo field (from cache)`
           );
 
-          // For cached PNG files, we need to extract the direct URL from the cached logoUrl
+          // For cached files, we need to extract the direct URL from the cached logoUrl
           // This is a bit tricky since we don't have the original upload result
           // Let's try to get the direct URL by removing any query parameters
           let originalLogoUrl = logoUrl;
@@ -594,7 +652,9 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
           // Use the dedicated function to update the logo URL with the original uncompressed URL
           await activeCampaign.updateLeadLogoUrl(email, originalLogoUrl);
           console.log(
-            "Campo mockup_logotipo atualizado com sucesso com URL original não comprimida (do cache)"
+            `Campo mockup_logotipo atualizado com sucesso com URL original não comprimida do ${
+              mime === "image/png" ? "PNG" : "PDF"
+            } (do cache)`
           );
         } else {
           // For other file types, use the standard URL
@@ -650,6 +710,7 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
       );
       try {
         // Check if this is a PNG file (we want to ensure it's uncompressed)
+        // Note: For PDF files, we already updated the mockup_logotipo field earlier in the process
         if (mime === "image/png") {
           console.log(
             "PNG file detected - ensuring original uncompressed URL is used for mockup_logotipo field"
@@ -668,6 +729,11 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
           await activeCampaign.updateLeadLogoUrl(email, originalLogoUrl);
           console.log(
             "Campo mockup_logotipo atualizado com sucesso com URL original não comprimida"
+          );
+        } else if (mime === "application/pdf") {
+          // For PDF files, we already updated the mockup_logotipo field earlier in the process
+          console.log(
+            "PDF file detected - mockup_logotipo field already updated with original PDF URL"
           );
         } else {
           // For other file types, use the standard URL
