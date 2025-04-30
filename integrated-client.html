@@ -10,8 +10,10 @@
     <meta name="robots" content="noindex" />
     <title>Formulário de Solicitação - HUD LAB</title>
     <style>
+      @import url(https://fonts.bunny.net/css?family=poppins:400,700);
+
       body {
-        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        font-family: "Poppins", sans-serif;
         line-height: 1.6;
         color: #333;
         max-width: 100%;
@@ -24,24 +26,18 @@
       /* Container para o formulário */
       .main-container {
         width: 100%;
-        max-width: 600px;
+        max-width: 500px;
         margin: 0 auto;
         padding: 10px;
         box-sizing: border-box;
       }
 
-      h1 {
-        color: #2c3e50;
-        text-align: center;
-        margin-bottom: 30px;
-      }
-
       .form-container {
-        background-color: #fff;
-        border-radius: 8px;
-        padding: 30px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        margin-bottom: 30px;
+        background-color: #FFFFFF;
+        border-radius: 24px;
+        padding: 20px;
+        margin-top: 25px;
+        box-sizing: border-box;
       }
 
       .form-group {
@@ -51,7 +47,9 @@
       label {
         display: block;
         margin-bottom: 8px;
-        font-weight: 600;
+        font-weight: 700;
+        font-size: 14px;
+        color: #000000;
       }
 
       input[type="text"],
@@ -60,11 +58,12 @@
       select {
         width: 100%;
         padding: 12px;
-        border: 1px solid #ddd;
+        border: 1px solid #979797;
         border-radius: 4px;
-        font-size: 16px;
+        font-size: 14px;
         transition: border-color 0.3s;
-        box-sizing: border-box; /* Garante que padding não aumente a largura */
+        box-sizing: border-box;
+        font-family: "Poppins", sans-serif;
       }
 
       input[type="text"]:focus,
@@ -82,7 +81,7 @@
       }
 
       .file-input-label {
-        display: block; /* Alterado de inline-block para block */
+        display: block;
         background-color: #e9ecef;
         color: #495057;
         padding: 12px 20px;
@@ -111,58 +110,23 @@
       }
 
       button {
-        background-color: #0dc220;
+        background-color: #0DC220;
         color: white;
         border: none;
         padding: 14px 20px;
         border-radius: 4px;
         cursor: pointer;
-        font-size: 16px;
-        font-weight: 600;
+        font-size: 14px;
+        font-weight: 400;
         width: 100%;
-        box-sizing: border-box; /* Garante que padding não aumente a largura */
-        display: block; /* Garante que ocupe toda a linha */
+        box-sizing: border-box;
+        display: block;
         transition: background-color 0.3s;
+        font-family: "Poppins", sans-serif;
       }
 
       button:hover {
         background-color: #0aa51b;
-      }
-
-      .result-container {
-        background-color: #fff;
-        border-radius: 8px;
-        padding: 30px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        margin-top: 30px;
-        text-align: center;
-        display: none;
-      }
-
-      .mockup-image {
-        max-width: 100%;
-        border-radius: 8px;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-        margin-bottom: 20px;
-      }
-
-      .info-box {
-        background-color: #e8f4fd;
-        border-left: 4px solid #3498db;
-        padding: 15px;
-        margin-bottom: 20px;
-        border-radius: 4px;
-      }
-
-      .error-message {
-        color: #e74c3c;
-        font-weight: 600;
-        margin-top: 8px;
-        padding: 8px;
-        border-left: 3px solid #e74c3c;
-        background-color: rgba(231, 76, 60, 0.1);
-        border-radius: 3px;
-        display: none;
       }
 
       .loading {
@@ -190,80 +154,15 @@
         }
       }
 
-      .success-message {
-        background-color: #d4edda;
-        color: #155724;
-        padding: 15px;
-        border-radius: 4px;
-        margin-top: 20px;
-        text-align: center;
-        display: none;
-      }
-
-      .download-link {
-        display: inline-block;
-        background-color: #2ecc71;
-        color: white;
-        text-decoration: none;
-        padding: 12px 24px;
-        border-radius: 4px;
-        margin-top: 15px;
+      .error-message {
+        color: #e74c3c;
         font-weight: 600;
-        transition: background-color 0.3s;
-      }
-
-      .download-link:hover {
-        background-color: #27ae60;
-      }
-
-      .whatsapp-button {
-        display: inline-block;
-        background-color: #25d366;
-        color: white;
-        text-decoration: none;
-        padding: 12px 24px;
-        border-radius: 4px;
-        margin-top: 15px;
-        font-weight: 600;
-        transition: background-color 0.3s;
-      }
-
-      .whatsapp-button:hover {
-        background-color: #128c7e;
-      }
-
-      .whatsapp-icon {
-        margin-right: 8px;
-      }
-
-      .redirect-message {
-        background-color: #d5f5e3;
-        border-left: 4px solid #2ecc71;
-        padding: 15px;
-        border-radius: 4px;
-        margin-top: 20px;
-        text-align: center;
+        margin-top: 8px;
+        padding: 8px;
+        border-left: 3px solid #e74c3c;
+        background-color: rgba(231, 76, 60, 0.1);
+        border-radius: 3px;
         display: none;
-      }
-
-      .countdown {
-        font-weight: bold;
-        font-size: 18px;
-      }
-
-      .logo-requirements {
-        margin-top: 10px;
-        font-size: 14px;
-        color: #6c757d;
-      }
-
-      .logo-requirements ul {
-        padding-left: 20px;
-        margin-top: 5px;
-      }
-
-      .logo-requirements li {
-        margin-bottom: 3px;
       }
 
       /* Estilo para o disclaimer */
@@ -278,122 +177,152 @@
         line-height: 1.5;
         width: 100%;
         box-sizing: border-box;
-        text-align: justify; /* Texto justificado */
+        text-align: justify;
       }
 
       .disclaimer-box strong {
         color: #856404;
+      }
+
+      /* Estilos específicos do ActiveCampaign */
+      ._form-content {
+        width: 100%;
+      }
+
+      ._form_element {
+        margin-bottom: 10px;
+      }
+
+      ._form-label {
+        font-weight: 700;
+        margin-bottom: 5px;
+        display: block;
+        font-size: 14px;
+        color: #000000;
+      }
+
+      ._field-wrapper {
+        width: 100%;
+      }
+
+      ._form-thank-you {
+        display: none;
+        text-align: center;
+        font-size: 18px;
+        margin-top: 20px;
       }
     </style>
   </head>
   <body>
     <div class="main-container">
       <div class="form-container">
-        <form id="mockupForm" target="_top">
-          <div class="form-group">
-            <label for="name">Nome Completo:</label>
-            <input
-              type="text"
-              id="name"
-              name="name"
-              placeholder="Seu nome completo"
-              required
-            />
-          </div>
-
-          <div class="form-group">
-            <label for="email">Email:</label>
-            <input
-              type="email"
-              id="email"
-              name="email"
-              placeholder="seu.email@exemplo.com"
-              required
-            />
-            <div class="error-message" id="emailError">
-              Por favor, insira um email válido.
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label for="phone">WhatsApp (com DDD):</label>
-            <input
-              type="tel"
-              id="phone"
-              name="phone"
-              placeholder="11999999999"
-              required
-            />
-            <div class="error-message" id="phoneError">
-              Por favor, insira um número válido com DDD.
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label for="segmento">Segmento de Negócio*</label>
-            <select id="segmento" name="segmento" required>
-              <option value="">Selecione uma opção</option>
-              <option value="Marca de Roupa">Marca de Roupa</option>
-              <option value="Marca de Calçado">Marca de Calçado</option>
-              <option value="Time de Futebol ou Outro Esporte">
-                Time de Futebol ou Outro Esporte
-              </option>
-              <option value="Atlética Universitária">
-                Atlética Universitária
-              </option>
-              <option value="Marca de Cosméticos e Estética">
-                Marca de Cosméticos e Estética
-              </option>
-              <option value="Igreja ou Instituição Religiosa">
-                Igreja ou Instituição Religiosa
-              </option>
-              <option value="Empresa em Geral">Empresa em Geral</option>
-              <option value="Negócio Local">Negócio Local</option>
-              <option value="Academia/Crossfit/Grupo de Corrida">
-                Academia/Crossfit/Grupo de Corrida
-              </option>
-              <option value="Agência de Marketing">Agência de Marketing</option>
-              <option value="Produtora de Eventos">Produtora de Eventos</option>
-              <option value="Outro">Outro</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label for="logo">Logotipo:</label>
-            <div class="file-input-container">
-              <label for="logo" class="file-input-label"
-                >Escolher arquivo</label
-              >
-              <input
-                type="file"
-                id="logo"
-                name="logo"
-                accept=".png,.jpg,.jpeg,.pdf"
-                class="file-input"
-                required
-              />
-              <div class="file-name" id="fileName">
-                Nenhum arquivo selecionado
+        <form method="POST" action="https://hudlabprivatelabel.activehosted.com/proc.php" id="mockupForm" class="_form _form_1 _inline-form _dark" novalidate>
+          <input type="hidden" name="u" value="1" />
+          <input type="hidden" name="f" value="1" />
+          <input type="hidden" name="s" />
+          <input type="hidden" name="c" value="0" />
+          <input type="hidden" name="m" value="0" />
+          <input type="hidden" name="act" value="sub" />
+          <input type="hidden" name="v" value="2" />
+          <input type="hidden" name="or" value="9241ef23d5336af6b77472dcf15f770c" />
+          
+          <!-- Campos para UTM -->
+          <input type="hidden" name="field[2]" id="utm_source" value="" />
+          <input type="hidden" name="field[3]" id="utm_medium" value="" />
+          <input type="hidden" name="field[4]" id="utm_campaign" value="" />
+          <input type="hidden" name="field[5]" id="utm_term" value="" />
+          <input type="hidden" name="field[6]" id="utm_content" value="" />
+          
+          <!-- Campos para mockup URLs -->
+          <input type="hidden" name="field[41]" id="mockup_url" value="" />
+          <input type="hidden" name="field[42]" id="mockup_logotipo" value="" />
+          
+          <div class="_form-content">
+            <div class="_form_element _full_width">
+              <label for="fullname" class="_form-label"></label>
+              <div class="_field-wrapper">
+                <input type="text" id="fullname" name="fullname" placeholder="Nome*" required/>
               </div>
             </div>
-            <div class="error-message" id="logoError">
-              Por favor, selecione um arquivo PNG, JPG ou PDF.
+            
+            <div class="_form_element _full_width">
+              <label for="phone" class="_form-label"></label>
+              <div class="_field-wrapper">
+                <input type="text" id="phone" name="phone" placeholder="Telefone/Whats com DDD*" required/>
+              </div>
+            </div>
+            
+            <div class="_form_element _full_width">
+              <label for="email" class="_form-label"></label>
+              <div class="_field-wrapper">
+                <input type="text" id="email" name="email" placeholder="E-mail*" required/>
+                <div class="error-message" id="emailError">
+                  Por favor, insira um email válido.
+                </div>
+              </div>
+            </div>
+            
+            <div class="_form_element _full_width">
+              <label for="field[7]" class="_form-label">
+                Informe seu Segmento de Negócio
+              </label>
+              <div class="_field-wrapper">
+                <select name="field[7]" id="field[7]">
+                  <option selected></option>
+                  <option value="Marca de Roupa">Marca de Roupa</option>
+                  <option value="Marca de Calçado">Marca de Calçado</option>
+                  <option value="Time de Futebol ou Outro Esporte">Time de Futebol ou Outro Esporte</option>
+                  <option value="Atlética Universitária">Atlética Universitária</option>
+                  <option value="Marca de Cosméticos e Estética">Marca de Cosméticos e Estética</option>
+                  <option value="Igreja ou Instituição Religiosa">Igreja ou Instituição Religiosa</option>
+                  <option value="Empresa em Geral">Empresa em Geral</option>
+                  <option value="Negócio Local">Negócio Local</option>
+                  <option value="Academia/Crossfit/Grupo de Corrida">Academia/Crossfit/Grupo de Corrida</option>
+                  <option value="Outro">Outro</option>
+                </select>
+              </div>
+            </div>
+            
+            <!-- Componente de upload de arquivo -->
+            <div class="_form_element _full_width">
+              <label for="logo" class="_form-label">Logotipo:</label>
+              <div class="file-input-container">
+                <label for="logo" class="file-input-label">Clique ou arraste aqui seu arquivo JPG, PNG ou PDF</label>
+                <input
+                  type="file"
+                  id="logo"
+                  name="logo"
+                  accept=".png,.jpg,.jpeg,.pdf"
+                  class="file-input"
+                  required
+                />
+                <div class="file-name" id="fileName">
+                  Nenhum arquivo selecionado
+                </div>
+              </div>
+              <div class="error-message" id="logoError">
+                Por favor, selecione um arquivo PNG, JPG ou PDF.
+              </div>
+            </div>
+            
+            <!-- Disclaimer sobre o upload de logo obrigatório -->
+            <div class="disclaimer-box">
+              <p>
+                <strong>Atenção:</strong> O upload do arquivo de logo é
+                obrigatório para a geração do mockup. Por favor, selecione um
+                arquivo PNG, JPG ou PDF antes de enviar o formulário.
+              </p>
+            </div>
+            
+            <div class="_button-wrapper _full_width">
+              <button id="_form_1_submit" class="_submit" type="submit">
+                Enviar
+              </button>
             </div>
           </div>
-
-          <!-- Processamento feito pelo AWS Lambda -->
-          <input type="hidden" name="processingMethod" value="lambda" />
-
-          <!-- Disclaimer sobre o upload de logo obrigatório -->
-          <div class="disclaimer-box">
-            <p>
-              <strong>Atenção:</strong> O upload do arquivo de logo é
-              obrigatório para a geração do mockup. Por favor, selecione um
-              arquivo PNG, JPG ou PDF antes de enviar o formulário.
-            </p>
+          
+          <div class="_form-thank-you" style="display:none;">
           </div>
-
-          <button type="submit" id="submitBtn">Enviar</button>
         </form>
       </div>
 
@@ -408,11 +337,31 @@
       document.addEventListener("DOMContentLoaded", function () {
         const form = document.getElementById("mockupForm");
         const emailError = document.getElementById("emailError");
-        const phoneError = document.getElementById("phoneError");
         const logoError = document.getElementById("logoError");
         const fileInput = document.getElementById("logo");
         const fileName = document.getElementById("fileName");
         const loadingIndicator = document.getElementById("loadingIndicator");
+        
+        // Capturar parâmetros UTM da URL e preencher campos ocultos
+        function getUtmParams() {
+          const urlParams = new URLSearchParams(window.location.search);
+          const utmFields = [
+            { param: 'utm_source', field: 'utm_source' },
+            { param: 'utm_medium', field: 'utm_medium' },
+            { param: 'utm_campaign', field: 'utm_campaign' },
+            { param: 'utm_term', field: 'utm_term' },
+            { param: 'utm_content', field: 'utm_content' }
+          ];
+          
+          utmFields.forEach(item => {
+            if (urlParams.has(item.param)) {
+              document.getElementById(item.field).value = urlParams.get(item.param);
+            }
+          });
+        }
+        
+        // Chamar função para capturar UTMs
+        getUtmParams();
 
         // Update file name when file is selected
         fileInput.addEventListener("change", function () {
@@ -439,7 +388,6 @@
 
           // Reset error messages
           emailError.style.display = "none";
-          phoneError.style.display = "none";
           logoError.style.display = "none";
 
           // Validate email
@@ -449,20 +397,13 @@
             return;
           }
 
-          // Validate phone
-          const phone = document.getElementById("phone").value;
-          if (!phone || phone.length < 10) {
-            phoneError.style.display = "block";
-            return;
-          }
-
-          // Validate logo file - Abordagem direta
+          // Validate logo file
           const logoFile = document.getElementById("logo").files[0];
           if (!logoFile) {
             logoError.textContent =
               "Por favor, selecione um arquivo antes de enviar.";
             logoError.style.display = "block";
-            fileInput.focus(); // Dá foco ao input para melhor acessibilidade
+            fileInput.focus();
             return;
           }
 
@@ -475,19 +416,8 @@
             return;
           }
 
-          // Create form data
-          const formData = new FormData();
-          formData.append("name", document.getElementById("name").value);
-          formData.append("email", email);
-          formData.append("phone", phone);
-          formData.append("logo", logoFile);
-          formData.append(
-            "segmento",
-            document.getElementById("segmento").value
-          );
-
           // Adicionar um indicador de carregamento antes de enviar o formulário
-          const submitBtn = document.getElementById("submitBtn");
+          const submitBtn = document.getElementById("_form_1_submit");
           const originalButtonText = submitBtn.textContent;
           submitBtn.textContent = "Enviando...";
           submitBtn.disabled = true;
@@ -496,56 +426,44 @@
           loadingIndicator.style.display = "block";
 
           try {
-            // Armazenar os dados do formulário em localStorage como backup
-            const formDataToStore = {
-              name: document.getElementById("name").value,
-              email: email,
-              phone: phone,
-              segmento: document.getElementById("segmento").value,
-              timestamp: Date.now(),
-            };
+            // Primeiro, enviar o arquivo para o servidor
+            const formData = new FormData();
+            formData.append("name", document.getElementById("fullname").value);
+            formData.append("email", email);
+            formData.append("phone", document.getElementById("phone").value);
+            formData.append("segmento", document.getElementById("field[7]").value);
+            formData.append("logo", logoFile);
 
-            // Salvar no localStorage
-            localStorage.setItem(
-              "pendingFormData",
-              JSON.stringify(formDataToStore)
-            );
-
-            console.log("Enviando formulário e aguardando resposta...");
-
-            // Definir o endpoint
-            const endpoint = "/api/mockup";
-
-            // Enviar o formulário e aguardar a resposta
-            const response = await fetch(endpoint, {
+            // Enviar o arquivo para o servidor
+            const response = await fetch("/api/mockup", {
               method: "POST",
               body: formData,
             });
 
-            if (response.ok) {
-              console.log("Formulário enviado com sucesso!");
-              const data = await response.json();
-              console.log("Resposta do servidor:", data);
-
-              // Redirecionar para a página de agradecimento após receber a resposta
-              window.top.location.href =
-                "https://hudlab.com.br/obrigado-amostra-digital2";
-            } else {
-              console.error(
-                "Erro ao enviar formulário:",
-                await response.text()
-              );
-              alert(
-                "Ocorreu um erro ao processar o formulário. Por favor, tente novamente."
-              );
-
-              // Restaurar o botão
-              submitBtn.textContent = originalButtonText;
-              submitBtn.disabled = false;
-
-              // Esconder o indicador de carregamento
-              loadingIndicator.style.display = "none";
+            if (!response.ok) {
+              throw new Error("Erro ao processar o arquivo");
             }
+
+            const data = await response.json();
+            console.log("Resposta do servidor:", data);
+
+            // Preencher os campos ocultos com as URLs
+            if (data.url) {
+              document.getElementById("mockup_url").value = data.url;
+            }
+            
+            if (data.logoUrl) {
+              document.getElementById("mockup_logotipo").value = data.logoUrl;
+            }
+
+            // Agora enviar o formulário para o ActiveCampaign
+            console.log("Enviando dados para o ActiveCampaign...");
+            
+            // Usar o método tradicional de envio de formulário para o ActiveCampaign
+            form.submit();
+            
+            // Redirecionar para a página de agradecimento após envio
+            // Isso será tratado pelo ActiveCampaign após o processamento do formulário
           } catch (error) {
             console.error("Erro ao processar o formulário:", error);
             alert(
@@ -558,9 +476,6 @@
 
             // Esconder o indicador de carregamento
             loadingIndicator.style.display = "none";
-
-            // Se houver um erro crítico, ainda podemos redirecionar
-            // window.top.location.href = "https://hudlab.com.br/obrigado-amostra-digital2";
           }
         });
       });
