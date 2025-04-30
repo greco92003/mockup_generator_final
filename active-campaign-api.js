@@ -18,6 +18,23 @@ console.log(
   AC_API_KEY.substring(0, 10) + "..."
 );
 
+// Verificar se as variáveis de ambiente estão definidas
+if (!AC_API_URL) {
+  console.error("ERRO: ACTIVE_CAMPAIGN_URL não está definido no arquivo .env");
+}
+
+if (!AC_API_KEY) {
+  console.error(
+    "ERRO: ACTIVE_CAMPAIGN_API_KEY não está definido no arquivo .env"
+  );
+}
+
+// Verificar se o dotenv carregou as variáveis de ambiente
+console.log(
+  "Variáveis de ambiente carregadas pelo dotenv:",
+  Object.keys(process.env).filter((key) => key.includes("ACTIVE_CAMPAIGN"))
+);
+
 /**
  * Find a contact in ActiveCampaign by email
  * @param {string} email - Email to search for
@@ -25,19 +42,47 @@ console.log(
  */
 async function findContactByEmail(email) {
   try {
+    console.log(`Buscando contato com email: ${email}`);
+    console.log(
+      `URL da API: ${AC_API_URL}/api/3/contacts?email=${encodeURIComponent(
+        email
+      )}`
+    );
+
+    // Verificar se o token da API está definido
+    if (!AC_API_KEY) {
+      console.error("API Token do ActiveCampaign não está definido");
+      throw new Error("API Token do ActiveCampaign não está definido");
+    }
+
+    const headers = {
+      "Api-Token": AC_API_KEY,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    };
+
+    console.log("Headers:", JSON.stringify(headers));
+
     const response = await fetch(
       `${AC_API_URL}/api/3/contacts?email=${encodeURIComponent(email)}`,
       {
         method: "GET",
-        headers: {
-          "Api-Token": AC_API_KEY,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
+        headers,
       }
     );
 
-    const data = await response.json();
+    // Log da resposta para debug
+    const responseText = await response.text();
+    console.log(`Resposta da API (status: ${response.status}):`, responseText);
+
+    // Converter a resposta de texto para JSON
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error("Erro ao analisar resposta JSON:", parseError);
+      throw new Error(`Resposta inválida da API: ${responseText}`);
+    }
 
     if (data.contacts && data.contacts.length > 0) {
       console.log(`Contact found in ActiveCampaign: ${data.contacts[0].id}`);
@@ -48,6 +93,7 @@ async function findContactByEmail(email) {
     return null;
   } catch (error) {
     console.error("Error finding contact in ActiveCampaign:", error);
+    console.error("Stack trace:", error.stack);
     throw error;
   }
 }
@@ -61,24 +107,54 @@ async function createContact(contactData) {
   try {
     const { email, firstName, lastName, phone } = contactData;
 
-    const response = await fetch(`${AC_API_URL}/api/3/contacts`, {
-      method: "POST",
-      headers: {
-        "Api-Token": AC_API_KEY,
-        "Content-Type": "application/json",
-        Accept: "application/json",
+    console.log(
+      `Criando novo contato com email: ${email}, nome: ${firstName} ${lastName}, telefone: ${phone}`
+    );
+    console.log(`URL da API: ${AC_API_URL}/api/3/contacts`);
+
+    // Verificar se o token da API está definido
+    if (!AC_API_KEY) {
+      console.error("API Token do ActiveCampaign não está definido");
+      throw new Error("API Token do ActiveCampaign não está definido");
+    }
+
+    // Log dos headers e body para debug
+    const headers = {
+      "Api-Token": AC_API_KEY,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    };
+
+    const body = JSON.stringify({
+      contact: {
+        email,
+        firstName,
+        lastName,
+        phone,
       },
-      body: JSON.stringify({
-        contact: {
-          email,
-          firstName,
-          lastName,
-          phone,
-        },
-      }),
     });
 
-    const data = await response.json();
+    console.log("Headers:", JSON.stringify(headers));
+    console.log("Body:", body);
+
+    const response = await fetch(`${AC_API_URL}/api/3/contacts`, {
+      method: "POST",
+      headers,
+      body,
+    });
+
+    // Log da resposta para debug
+    const responseText = await response.text();
+    console.log(`Resposta da API (status: ${response.status}):`, responseText);
+
+    // Converter a resposta de texto para JSON
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error("Erro ao analisar resposta JSON:", parseError);
+      throw new Error(`Resposta inválida da API: ${responseText}`);
+    }
 
     if (data.contact) {
       console.log(`Contact created in ActiveCampaign: ${data.contact.id}`);
@@ -88,6 +164,7 @@ async function createContact(contactData) {
     throw new Error(`Failed to create contact: ${JSON.stringify(data)}`);
   } catch (error) {
     console.error("Error creating contact in ActiveCampaign:", error);
+    console.error("Stack trace:", error.stack);
     throw error;
   }
 }
@@ -547,13 +624,59 @@ async function processLeadBasicInfo(leadData) {
     } else {
       console.log(`Contato não encontrado, criando novo contato...`);
       // Create new contact
-      contact = await createContact({
-        email,
-        firstName,
-        lastName,
-        phone,
-      });
-      console.log(`Novo contato criado com ID: ${contact.id}`);
+      try {
+        contact = await createContact({
+          email,
+          firstName,
+          lastName,
+          phone,
+        });
+        console.log(`Novo contato criado com ID: ${contact.id}`);
+      } catch (createError) {
+        console.error("Erro ao criar novo contato:", createError);
+
+        // Tentar novamente com uma abordagem alternativa
+        console.log("Tentando abordagem alternativa para criar contato...");
+        try {
+          // Fazer uma chamada direta à API
+          const directResponse = await fetch(`${AC_API_URL}/api/3/contacts`, {
+            method: "POST",
+            headers: {
+              "Api-Token": AC_API_KEY,
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+            body: JSON.stringify({
+              contact: {
+                email,
+                firstName,
+                lastName,
+                phone,
+              },
+            }),
+          });
+
+          const directData = await directResponse.json();
+
+          if (directData.contact) {
+            contact = directData.contact;
+            console.log(
+              `Contato criado com sucesso usando abordagem alternativa: ${contact.id}`
+            );
+          } else {
+            console.error(
+              "Falha na criação do contato usando abordagem alternativa:",
+              directData
+            );
+            throw new Error(
+              `Falha na criação do contato: ${JSON.stringify(directData)}`
+            );
+          }
+        } catch (directError) {
+          console.error("Erro na criação direta do contato:", directError);
+          throw directError;
+        }
+      }
     }
 
     // Process segmento field if provided
