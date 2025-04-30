@@ -180,9 +180,88 @@ async function processLeadAsync(leadData, mockupUrl) {
   }
 }
 
+/**
+ * Update logo URL for a contact in ActiveCampaign asynchronously
+ * @param {string} email - Email of the contact
+ * @param {string} logoUrl - URL of the original logo
+ */
+async function updateLeadLogoUrlAsync(email, logoUrl) {
+  // Verificar se o logoUrl está definido
+  if (!logoUrl) {
+    console.error(
+      "updateLeadLogoUrlAsync: logoUrl está indefinido, não adicionando à fila"
+    );
+    return;
+  }
+
+  console.log(
+    "Adicionando tarefa de atualização de URL do logo à fila assíncrona..."
+  );
+  console.log("Email:", email);
+  console.log(
+    "URL do logo (primeiros 50 caracteres):",
+    logoUrl.substring(0, 50) + "..."
+  );
+
+  addTask(
+    async (data) => {
+      const { email, logoUrl } = data;
+
+      // Verificação adicional dentro da tarefa
+      if (!logoUrl) {
+        console.error(
+          "Tarefa de atualização do logo: logoUrl está indefinido, pulando processamento"
+        );
+        return;
+      }
+
+      console.log(
+        "Iniciando atualização assíncrona do URL do logo no ActiveCampaign..."
+      );
+
+      try {
+        // Esperar um tempo para garantir que o contato já foi criado
+        console.log(
+          "Aguardando 2 segundos para garantir que o contato já foi criado..."
+        );
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        console.log(
+          "Chamando API do ActiveCampaign para atualizar URL do logo..."
+        );
+        await activeCampaign.updateLeadLogoUrl(email, logoUrl);
+        console.log("URL do logo atualizado com sucesso no ActiveCampaign");
+      } catch (acError) {
+        console.error(
+          "Erro ao atualizar URL do logo no ActiveCampaign:",
+          acError
+        );
+        console.error("Stack trace:", acError.stack);
+
+        // Se falhar, tentar novamente após um tempo maior
+        try {
+          console.log("Tentando novamente após 5 segundos...");
+          await new Promise((resolve) => setTimeout(resolve, 5000));
+
+          console.log("Tentando atualizar URL do logo novamente...");
+          await activeCampaign.updateLeadLogoUrl(email, logoUrl);
+          console.log(
+            "URL do logo atualizado com sucesso na segunda tentativa"
+          );
+        } catch (retryError) {
+          console.error("Erro na segunda tentativa:", retryError);
+          // We don't rethrow the error since this is async processing
+        }
+      }
+    },
+    { email, logoUrl }
+  );
+}
+
 module.exports = {
   processLeadAsync,
   processLeadBasicInfoAsync,
   updateMockupUrlAsync,
+  updateLeadLogoUrlAsync,
   addTask,
 };

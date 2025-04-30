@@ -524,15 +524,30 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
           );
 
           // Update the mockup_logotipo field with the original PDF URL
+          // Primeiro tenta atualizar diretamente (para contatos existentes)
           await activeCampaign.updateLeadLogoUrl(email, originalDirectUrl);
           console.log(
             "Campo mockup_logotipo atualizado com sucesso com URL do PDF original"
+          );
+
+          // Também agenda uma atualização assíncrona (para garantir que funcione para novos contatos)
+          asyncProcessor.updateLeadLogoUrlAsync(email, originalDirectUrl);
+          console.log(
+            "Atualização assíncrona do campo mockup_logotipo agendada para garantir funcionamento com novos contatos"
           );
         } catch (logoUrlError) {
           console.error(
             "Erro ao atualizar campo mockup_logotipo no ActiveCampaign com PDF original:",
             logoUrlError
           );
+
+          // Se falhar a atualização direta, ainda tenta a atualização assíncrona
+          console.log("Tentando atualização assíncrona como fallback...");
+          asyncProcessor.updateLeadLogoUrlAsync(
+            email,
+            originalUploadResult.directUrl || originalPdfUrl
+          );
+
           // Continue with the process even if this update fails
         }
       } catch (pdfUploadError) {
@@ -650,17 +665,31 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
           }
 
           // Use the dedicated function to update the logo URL with the original uncompressed URL
+          // Primeiro tenta atualizar diretamente (para contatos existentes)
           await activeCampaign.updateLeadLogoUrl(email, originalLogoUrl);
           console.log(
             `Campo mockup_logotipo atualizado com sucesso com URL original não comprimida do ${
               mime === "image/png" ? "PNG" : "PDF"
             } (do cache)`
           );
+
+          // Também agenda uma atualização assíncrona (para garantir que funcione para novos contatos)
+          asyncProcessor.updateLeadLogoUrlAsync(email, originalLogoUrl);
+          console.log(
+            "Atualização assíncrona do campo mockup_logotipo agendada para garantir funcionamento com novos contatos (do cache)"
+          );
         } else {
           // For other file types, use the standard URL
+          // Primeiro tenta atualizar diretamente (para contatos existentes)
           await activeCampaign.updateLeadLogoUrl(email, logoUrl);
           console.log(
             "Campo mockup_logotipo atualizado com sucesso (do cache)"
+          );
+
+          // Também agenda uma atualização assíncrona (para garantir que funcione para novos contatos)
+          asyncProcessor.updateLeadLogoUrlAsync(email, logoUrl);
+          console.log(
+            "Atualização assíncrona do campo mockup_logotipo agendada para garantir funcionamento com novos contatos (do cache)"
           );
         }
       } catch (logoUrlError) {
@@ -668,6 +697,17 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
           "Erro ao atualizar campo mockup_logotipo no ActiveCampaign (do cache):",
           logoUrlError
         );
+
+        // Se falhar a atualização direta, ainda tenta a atualização assíncrona
+        console.log(
+          "Tentando atualização assíncrona como fallback (do cache)..."
+        );
+        let originalLogoUrl = logoUrl;
+        if (logoUrl.includes("?")) {
+          originalLogoUrl = logoUrl.split("?")[0];
+        }
+        asyncProcessor.updateLeadLogoUrlAsync(email, originalLogoUrl);
+
         // Continue with the process even if this update fails
       }
     } else {
@@ -726,9 +766,16 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
           );
 
           // Use the dedicated function to update the logo URL with the original uncompressed URL
+          // Primeiro tenta atualizar diretamente (para contatos existentes)
           await activeCampaign.updateLeadLogoUrl(email, originalLogoUrl);
           console.log(
             "Campo mockup_logotipo atualizado com sucesso com URL original não comprimida"
+          );
+
+          // Também agenda uma atualização assíncrona (para garantir que funcione para novos contatos)
+          asyncProcessor.updateLeadLogoUrlAsync(email, originalLogoUrl);
+          console.log(
+            "Atualização assíncrona do campo mockup_logotipo agendada para garantir funcionamento com novos contatos"
           );
         } else if (mime === "application/pdf") {
           // For PDF files, we already updated the mockup_logotipo field earlier in the process
@@ -737,14 +784,30 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
           );
         } else {
           // For other file types, use the standard URL
+          // Primeiro tenta atualizar diretamente (para contatos existentes)
           await activeCampaign.updateLeadLogoUrl(email, logoUrl);
           console.log("Campo mockup_logotipo atualizado com sucesso");
+
+          // Também agenda uma atualização assíncrona (para garantir que funcione para novos contatos)
+          asyncProcessor.updateLeadLogoUrlAsync(email, logoUrl);
+          console.log(
+            "Atualização assíncrona do campo mockup_logotipo agendada para garantir funcionamento com novos contatos"
+          );
         }
       } catch (logoUrlError) {
         console.error(
           "Erro ao atualizar campo mockup_logotipo no ActiveCampaign:",
           logoUrlError
         );
+
+        // Se falhar a atualização direta, ainda tenta a atualização assíncrona
+        console.log("Tentando atualização assíncrona como fallback...");
+        let urlToUse = logoUrl;
+        if (mime === "image/png") {
+          urlToUse = uploadResult.directUrl || logoUrl;
+        }
+        asyncProcessor.updateLeadLogoUrlAsync(email, urlToUse);
+
         // Continue with the process even if this update fails
       }
 
