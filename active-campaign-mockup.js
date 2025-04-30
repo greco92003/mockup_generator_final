@@ -458,20 +458,30 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
       return res.status(400).json({ error: "Email is required" });
     }
 
-    // Process basic lead information synchronously
-    console.log("Processing basic lead information synchronously...");
-    try {
-      await activeCampaign.processLeadBasicInfo({
-        email,
-        name,
-        phone,
-        segmento,
-      });
-      console.log("Lead basic information processed successfully");
-    } catch (acError) {
-      console.error("Error processing lead basic information:", acError);
-      // Continue with the process even if this fails
-    }
+    // Process basic lead information asynchronously
+    console.log("Processing basic lead information asynchronously...");
+
+    // Use setTimeout to make this non-blocking
+    setTimeout(async () => {
+      try {
+        await activeCampaign.processLeadBasicInfo({
+          email,
+          name,
+          phone,
+          segmento,
+        });
+        console.log("Lead basic information processed successfully (async)");
+      } catch (acError) {
+        console.error(
+          "Error processing lead basic information (async):",
+          acError
+        );
+      }
+    }, 100);
+
+    console.log(
+      "Continuing with form processing while lead info is being sent to ActiveCampaign..."
+    );
 
     const mime = req.file.mimetype;
     console.log(`File type: ${mime}, size: ${req.file.size} bytes`);
@@ -720,36 +730,51 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
         "Armazenando URL do logotipo original no campo mockup_logotipo..."
       );
       try {
-        // Check if this is a PNG file (we want to ensure it's uncompressed)
-        // Note: For PDF files, we already updated the mockup_logotipo field earlier in the process
-        if (mime === "image/png") {
-          console.log(
-            "PNG file detected - ensuring original uncompressed URL is used for mockup_logotipo field"
-          );
-          console.log(
-            `Original upload result: ${JSON.stringify(uploadResult)}`
-          );
+        // For all file types, ensure we're using the direct URL without query parameters
+        let originalLogoUrl = logoUrl;
 
-          // Make sure we're using the direct URL from the upload result
-          const originalLogoUrl = uploadResult.directUrl || logoUrl;
-          console.log(
-            `Using original uncompressed PNG URL: ${originalLogoUrl}`
-          );
+        // If the URL contains query parameters (pre-signed URL), remove them
+        if (originalLogoUrl.includes("?")) {
+          originalLogoUrl = originalLogoUrl.split("?")[0];
+          console.log("Converting to direct URL for mockup_logotipo field:");
+          console.log("Original URL:", logoUrl);
+          console.log("Direct URL:", originalLogoUrl);
+        }
 
-          // Use the dedicated function to update the logo URL with the original uncompressed URL
-          await activeCampaign.updateLeadLogoUrl(email, originalLogoUrl);
-          console.log(
-            "Campo mockup_logotipo atualizado com sucesso com URL original não comprimida"
+        // Use the dedicated function to update the logo URL with the direct URL
+        console.log(
+          `Updating mockup_logotipo field with direct URL: ${originalLogoUrl}`
+        );
+
+        // Make multiple attempts to update the field if needed
+        let updateSuccess = false;
+        let attempts = 0;
+        const maxAttempts = 3;
+
+        while (!updateSuccess && attempts < maxAttempts) {
+          attempts++;
+          console.log(`Attempt ${attempts} to update mockup_logotipo field...`);
+
+          try {
+            await activeCampaign.updateLeadLogoUrl(email, originalLogoUrl);
+            console.log(
+              "Campo mockup_logotipo atualizado com sucesso com URL direta"
+            );
+            updateSuccess = true;
+          } catch (attemptError) {
+            console.error(`Erro na tentativa ${attempts}:`, attemptError);
+
+            if (attempts < maxAttempts) {
+              console.log(`Aguardando antes da próxima tentativa...`);
+              await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1 second before retrying
+            }
+          }
+        }
+
+        if (!updateSuccess) {
+          console.error(
+            `Falha em todas as ${maxAttempts} tentativas de atualizar o campo mockup_logotipo`
           );
-        } else if (mime === "application/pdf") {
-          // For PDF files, we already updated the mockup_logotipo field earlier in the process
-          console.log(
-            "PDF file detected - mockup_logotipo field already updated with original PDF URL"
-          );
-        } else {
-          // For other file types, use the standard URL
-          await activeCampaign.updateLeadLogoUrl(email, logoUrl);
-          console.log("Campo mockup_logotipo atualizado com sucesso");
         }
       } catch (logoUrlError) {
         console.error(
@@ -778,6 +803,17 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
             timestamp: Date.now(),
           });
 
+          // Convert mockupUrl to direct URL if it's a pre-signed URL
+          if (mockupUrl.includes("?")) {
+            const directUrl = mockupUrl.split("?")[0];
+            console.log(
+              "Converting pre-signed URL to direct URL for mockup_url field:"
+            );
+            console.log("Original URL:", mockupUrl);
+            console.log("Direct URL:", directUrl);
+            mockupUrl = directUrl;
+          }
+
           // Update mockup URL in ActiveCampaign synchronously
           console.log(
             "Atualizando URL do mockup no ActiveCampaign de forma síncrona..."
@@ -789,59 +825,91 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
             if (contact) {
               console.log(`Contato encontrado com ID: ${contact.id}`);
 
-              // Update the mockup_url field directly using the API
-              const response = await fetch(
-                `${process.env.ACTIVE_CAMPAIGN_URL}/api/3/fieldValues`,
-                {
-                  method: "POST",
-                  headers: {
-                    "Api-Token": process.env.ACTIVE_CAMPAIGN_API_KEY,
-                    "Content-Type": "application/json",
-                    Accept: "application/json",
-                  },
-                  body: JSON.stringify({
-                    fieldValue: {
-                      contact: contact.id,
-                      field: 41, // ID for mockup_url
-                      value: mockupUrl,
-                    },
-                  }),
-                }
-              );
+              // Make multiple attempts to update the field if needed
+              let updateSuccess = false;
+              let attempts = 0;
+              const maxAttempts = 3;
 
-              const data = await response.json();
-
-              if (data.fieldValue) {
+              while (!updateSuccess && attempts < maxAttempts) {
+                attempts++;
                 console.log(
-                  "Campo mockup_url atualizado com sucesso:",
-                  data.fieldValue
+                  `Attempt ${attempts} to update mockup_url field...`
                 );
 
-                // Verify the update
-                const fieldValues = await activeCampaign.getContactFieldValues(
-                  contact.id
-                );
-                const mockupUrlField = fieldValues.find(
-                  (field) => parseInt(field.id) === 41
-                );
+                try {
+                  // Update the mockup_url field directly using the API
+                  const response = await fetch(
+                    `${process.env.ACTIVE_CAMPAIGN_URL}/api/3/fieldValues`,
+                    {
+                      method: "POST",
+                      headers: {
+                        "Api-Token": process.env.ACTIVE_CAMPAIGN_API_KEY,
+                        "Content-Type": "application/json",
+                        Accept: "application/json",
+                      },
+                      body: JSON.stringify({
+                        fieldValue: {
+                          contact: contact.id,
+                          field: 41, // ID for mockup_url
+                          value: mockupUrl,
+                        },
+                      }),
+                    }
+                  );
 
-                if (mockupUrlField && mockupUrlField.value === mockupUrl) {
-                  console.log(
-                    "✅ Verificação confirmou que o campo mockup_url foi atualizado corretamente"
-                  );
-                } else {
-                  console.warn(
-                    "⚠️ Verificação não encontrou o valor esperado no campo mockup_url"
-                  );
-                  if (mockupUrlField) {
-                    console.log("Valor atual:", mockupUrlField.value);
-                    console.log("Valor esperado:", mockupUrl);
+                  const data = await response.json();
+
+                  if (data.fieldValue) {
+                    console.log(
+                      "Campo mockup_url atualizado com sucesso:",
+                      data.fieldValue
+                    );
+                    updateSuccess = true;
+
+                    // Verify the update
+                    const fieldValues =
+                      await activeCampaign.getContactFieldValues(contact.id);
+                    const mockupUrlField = fieldValues.find(
+                      (field) => parseInt(field.id) === 41
+                    );
+
+                    if (mockupUrlField && mockupUrlField.value === mockupUrl) {
+                      console.log(
+                        "✅ Verificação confirmou que o campo mockup_url foi atualizado corretamente"
+                      );
+                    } else {
+                      console.warn(
+                        "⚠️ Verificação não encontrou o valor esperado no campo mockup_url"
+                      );
+                      if (mockupUrlField) {
+                        console.log("Valor atual:", mockupUrlField.value);
+                        console.log("Valor esperado:", mockupUrl);
+                      }
+                    }
+                  } else {
+                    console.error(
+                      "Falha na atualização do campo mockup_url:",
+                      data
+                    );
+
+                    if (attempts < maxAttempts) {
+                      console.log(`Aguardando antes da próxima tentativa...`);
+                      await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1 second before retrying
+                    }
+                  }
+                } catch (attemptError) {
+                  console.error(`Erro na tentativa ${attempts}:`, attemptError);
+
+                  if (attempts < maxAttempts) {
+                    console.log(`Aguardando antes da próxima tentativa...`);
+                    await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1 second before retrying
                   }
                 }
-              } else {
+              }
+
+              if (!updateSuccess) {
                 console.error(
-                  "Falha na atualização do campo mockup_url:",
-                  data
+                  `Falha em todas as ${maxAttempts} tentativas de atualizar o campo mockup_url`
                 );
               }
             } else {
@@ -870,20 +938,42 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
       console.log(`Total processing time: ${totalTime}ms`);
     }
 
-    // Update mockup URL in ActiveCampaign synchronously if available
+    // Ensure we're using direct URLs for both mockup and logo
+    if (mockupUrl && mockupUrl.includes("?")) {
+      const directUrl = mockupUrl.split("?")[0];
+      console.log("Converting mockup URL to direct URL for response:");
+      console.log("Original URL:", mockupUrl);
+      console.log("Direct URL:", directUrl);
+      mockupUrl = directUrl;
+    }
+
+    if (logoUrl && logoUrl.includes("?")) {
+      const directLogoUrl = logoUrl.split("?")[0];
+      console.log("Converting logo URL to direct URL for response:");
+      console.log("Original URL:", logoUrl);
+      console.log("Direct URL:", directLogoUrl);
+      logoUrl = directLogoUrl;
+    }
+
+    // Update mockup URL in ActiveCampaign asynchronously if available
     if (mockupUrl) {
-      console.log("Updating mockup URL in ActiveCampaign synchronously...");
+      console.log("Updating mockup URL in ActiveCampaign asynchronously...");
       console.log("Mockup URL to update:", mockupUrl);
-      try {
-        await activeCampaign.updateLeadMockupUrl(email, mockupUrl);
-        console.log("Mockup URL updated successfully in ActiveCampaign");
-      } catch (mockupUrlError) {
-        console.error(
-          "Error updating mockup URL in ActiveCampaign:",
-          mockupUrlError
-        );
-        // Continue with the process even if this fails
-      }
+
+      // Use setTimeout to make this non-blocking
+      setTimeout(async () => {
+        try {
+          await activeCampaign.updateLeadMockupUrl(email, mockupUrl);
+          console.log(
+            "Mockup URL updated successfully in ActiveCampaign (async)"
+          );
+        } catch (mockupUrlError) {
+          console.error(
+            "Error updating mockup URL in ActiveCampaign (async):",
+            mockupUrlError
+          );
+        }
+      }, 100);
     } else {
       console.log("Mockup URL is undefined, skipping ActiveCampaign update");
     }
@@ -895,6 +985,7 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
       phone,
       image: mockupUrl,
       url: mockupUrl,
+      logoUrl: logoUrl, // Include the direct logo URL in the response
       redirect_url: WHATSAPP_REDIRECT_URL,
     };
 

@@ -33,7 +33,7 @@
       }
 
       .form-container {
-        background-color: #FFFFFF;
+        background-color: #ffffff;
         border-radius: 24px;
         padding: 20px;
         margin-top: 25px;
@@ -110,7 +110,7 @@
       }
 
       button {
-        background-color: #0DC220;
+        background-color: #0dc220;
         color: white;
         border: none;
         padding: 14px 20px;
@@ -216,7 +216,13 @@
   <body>
     <div class="main-container">
       <div class="form-container">
-        <form method="POST" action="https://hudlabprivatelabel.activehosted.com/proc.php" id="mockupForm" class="_form _form_1 _inline-form _dark" novalidate>
+        <form
+          method="POST"
+          action="https://hudlabprivatelabel.activehosted.com/proc.php"
+          id="mockupForm"
+          class="_form _form_1 _inline-form _dark"
+          novalidate
+        >
           <input type="hidden" name="u" value="1" />
           <input type="hidden" name="f" value="1" />
           <input type="hidden" name="s" />
@@ -224,44 +230,66 @@
           <input type="hidden" name="m" value="0" />
           <input type="hidden" name="act" value="sub" />
           <input type="hidden" name="v" value="2" />
-          <input type="hidden" name="or" value="9241ef23d5336af6b77472dcf15f770c" />
-          
+          <input
+            type="hidden"
+            name="or"
+            value="9241ef23d5336af6b77472dcf15f770c"
+          />
+
           <!-- Campos para UTM -->
           <input type="hidden" name="field[2]" id="utm_source" value="" />
           <input type="hidden" name="field[3]" id="utm_medium" value="" />
           <input type="hidden" name="field[4]" id="utm_campaign" value="" />
           <input type="hidden" name="field[5]" id="utm_term" value="" />
           <input type="hidden" name="field[6]" id="utm_content" value="" />
-          
+
           <!-- Campos para mockup URLs -->
           <input type="hidden" name="field[41]" id="mockup_url" value="" />
           <input type="hidden" name="field[42]" id="mockup_logotipo" value="" />
-          
+
           <div class="_form-content">
             <div class="_form_element _full_width">
               <label for="fullname" class="_form-label"></label>
               <div class="_field-wrapper">
-                <input type="text" id="fullname" name="fullname" placeholder="Nome*" required/>
+                <input
+                  type="text"
+                  id="fullname"
+                  name="fullname"
+                  placeholder="Nome*"
+                  required
+                />
               </div>
             </div>
-            
+
             <div class="_form_element _full_width">
               <label for="phone" class="_form-label"></label>
               <div class="_field-wrapper">
-                <input type="text" id="phone" name="phone" placeholder="Telefone/Whats com DDD*" required/>
+                <input
+                  type="text"
+                  id="phone"
+                  name="phone"
+                  placeholder="Telefone/Whats com DDD*"
+                  required
+                />
               </div>
             </div>
-            
+
             <div class="_form_element _full_width">
               <label for="email" class="_form-label"></label>
               <div class="_field-wrapper">
-                <input type="text" id="email" name="email" placeholder="E-mail*" required/>
+                <input
+                  type="text"
+                  id="email"
+                  name="email"
+                  placeholder="E-mail*"
+                  required
+                />
                 <div class="error-message" id="emailError">
                   Por favor, insira um email válido.
                 </div>
               </div>
             </div>
-            
+
             <div class="_form_element _full_width">
               <label for="field[7]" class="_form-label">
                 Informe seu Segmento de Negócio
@@ -271,23 +299,35 @@
                   <option selected></option>
                   <option value="Marca de Roupa">Marca de Roupa</option>
                   <option value="Marca de Calçado">Marca de Calçado</option>
-                  <option value="Time de Futebol ou Outro Esporte">Time de Futebol ou Outro Esporte</option>
-                  <option value="Atlética Universitária">Atlética Universitária</option>
-                  <option value="Marca de Cosméticos e Estética">Marca de Cosméticos e Estética</option>
-                  <option value="Igreja ou Instituição Religiosa">Igreja ou Instituição Religiosa</option>
+                  <option value="Time de Futebol ou Outro Esporte">
+                    Time de Futebol ou Outro Esporte
+                  </option>
+                  <option value="Atlética Universitária">
+                    Atlética Universitária
+                  </option>
+                  <option value="Marca de Cosméticos e Estética">
+                    Marca de Cosméticos e Estética
+                  </option>
+                  <option value="Igreja ou Instituição Religiosa">
+                    Igreja ou Instituição Religiosa
+                  </option>
                   <option value="Empresa em Geral">Empresa em Geral</option>
                   <option value="Negócio Local">Negócio Local</option>
-                  <option value="Academia/Crossfit/Grupo de Corrida">Academia/Crossfit/Grupo de Corrida</option>
+                  <option value="Academia/Crossfit/Grupo de Corrida">
+                    Academia/Crossfit/Grupo de Corrida
+                  </option>
                   <option value="Outro">Outro</option>
                 </select>
               </div>
             </div>
-            
+
             <!-- Componente de upload de arquivo -->
             <div class="_form_element _full_width">
               <label for="logo" class="_form-label">Logotipo:</label>
               <div class="file-input-container">
-                <label for="logo" class="file-input-label">Clique ou arraste aqui seu arquivo JPG, PNG ou PDF</label>
+                <label for="logo" class="file-input-label"
+                  >Clique ou arraste aqui seu arquivo JPG, PNG ou PDF</label
+                >
                 <input
                   type="file"
                   id="logo"
@@ -304,7 +344,7 @@
                 Por favor, selecione um arquivo PNG, JPG ou PDF.
               </div>
             </div>
-            
+
             <!-- Disclaimer sobre o upload de logo obrigatório -->
             <div class="disclaimer-box">
               <p>
@@ -313,16 +353,15 @@
                 arquivo PNG, JPG ou PDF antes de enviar o formulário.
               </p>
             </div>
-            
+
             <div class="_button-wrapper _full_width">
               <button id="_form_1_submit" class="_submit" type="submit">
                 Enviar
               </button>
             </div>
           </div>
-          
-          <div class="_form-thank-you" style="display:none;">
-          </div>
+
+          <div class="_form-thank-you" style="display: none"></div>
         </form>
       </div>
 
@@ -341,25 +380,27 @@
         const fileInput = document.getElementById("logo");
         const fileName = document.getElementById("fileName");
         const loadingIndicator = document.getElementById("loadingIndicator");
-        
+
         // Capturar parâmetros UTM da URL e preencher campos ocultos
         function getUtmParams() {
           const urlParams = new URLSearchParams(window.location.search);
           const utmFields = [
-            { param: 'utm_source', field: 'utm_source' },
-            { param: 'utm_medium', field: 'utm_medium' },
-            { param: 'utm_campaign', field: 'utm_campaign' },
-            { param: 'utm_term', field: 'utm_term' },
-            { param: 'utm_content', field: 'utm_content' }
+            { param: "utm_source", field: "utm_source" },
+            { param: "utm_medium", field: "utm_medium" },
+            { param: "utm_campaign", field: "utm_campaign" },
+            { param: "utm_term", field: "utm_term" },
+            { param: "utm_content", field: "utm_content" },
           ];
-          
-          utmFields.forEach(item => {
+
+          utmFields.forEach((item) => {
             if (urlParams.has(item.param)) {
-              document.getElementById(item.field).value = urlParams.get(item.param);
+              document.getElementById(item.field).value = urlParams.get(
+                item.param
+              );
             }
           });
         }
-        
+
         // Chamar função para capturar UTMs
         getUtmParams();
 
@@ -431,7 +472,10 @@
             formData.append("name", document.getElementById("fullname").value);
             formData.append("email", email);
             formData.append("phone", document.getElementById("phone").value);
-            formData.append("segmento", document.getElementById("field[7]").value);
+            formData.append(
+              "segmento",
+              document.getElementById("field[7]").value
+            );
             formData.append("logo", logoFile);
 
             // Enviar o arquivo para o servidor
@@ -447,21 +491,39 @@
             const data = await response.json();
             console.log("Resposta do servidor:", data);
 
-            // Preencher os campos ocultos com as URLs
+            // Preencher os campos ocultos com as URLs diretas
             if (data.url) {
-              document.getElementById("mockup_url").value = data.url;
+              // Ensure we're using a direct URL without query parameters
+              let directUrl = data.url;
+              if (directUrl.includes("?")) {
+                directUrl = directUrl.split("?")[0];
+                console.log("Converting to direct URL for mockup_url field:");
+                console.log("Original URL:", data.url);
+                console.log("Direct URL:", directUrl);
+              }
+              document.getElementById("mockup_url").value = directUrl;
             }
-            
+
             if (data.logoUrl) {
-              document.getElementById("mockup_logotipo").value = data.logoUrl;
+              // Ensure we're using a direct URL without query parameters
+              let directLogoUrl = data.logoUrl;
+              if (directLogoUrl.includes("?")) {
+                directLogoUrl = directLogoUrl.split("?")[0];
+                console.log(
+                  "Converting to direct URL for mockup_logotipo field:"
+                );
+                console.log("Original URL:", data.logoUrl);
+                console.log("Direct URL:", directLogoUrl);
+              }
+              document.getElementById("mockup_logotipo").value = directLogoUrl;
             }
 
             // Agora enviar o formulário para o ActiveCampaign
             console.log("Enviando dados para o ActiveCampaign...");
-            
+
             // Usar o método tradicional de envio de formulário para o ActiveCampaign
             form.submit();
-            
+
             // Redirecionar para a página de agradecimento após envio
             // Isso será tratado pelo ActiveCampaign após o processamento do formulário
           } catch (error) {

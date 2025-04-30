@@ -145,7 +145,7 @@ async function generateMockupWithLambda(logoUrl, email, name) {
     }
 
     // Extract the mockup URL from the response
-    const mockupUrl = response.data.mockupUrl;
+    let mockupUrl = response.data.mockupUrl;
     if (!mockupUrl) {
       console.error("Invalid response from Lambda:", response.data);
       throw new Error(
@@ -153,6 +153,15 @@ async function generateMockupWithLambda(logoUrl, email, name) {
           "This could be due to permission issues with the AWS Lambda function. " +
           "Please check the Lambda function's permissions and make sure it can access the S3 bucket."
       );
+    }
+
+    // Convert pre-signed URL to direct URL by removing query parameters
+    if (mockupUrl.includes("?")) {
+      const directUrl = mockupUrl.split("?")[0];
+      console.log("Converting pre-signed URL to direct URL:");
+      console.log("Original URL:", mockupUrl);
+      console.log("Direct URL:", directUrl);
+      mockupUrl = directUrl;
     }
 
     console.log("Mockup generated successfully with Lambda:", mockupUrl);
