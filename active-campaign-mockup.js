@@ -1362,6 +1362,11 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "integrated-client.html"));
 });
 
+// Route to serve the test page
+app.get("/test", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "test-form-integration.html"));
+});
+
 // Start the server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
