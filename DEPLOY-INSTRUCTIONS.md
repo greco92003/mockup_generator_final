@@ -43,16 +43,19 @@ PORT=3001
 Se estiver usando o Vercel, siga estes passos:
 
 1. Instale a CLI do Vercel:
+
    ```
    npm install -g vercel
    ```
 
 2. Faça login na sua conta:
+
    ```
    vercel login
    ```
 
 3. Configure o projeto:
+
    ```
    vercel init
    ```
@@ -67,21 +70,25 @@ Se estiver usando o Vercel, siga estes passos:
 Se estiver usando o Heroku, siga estes passos:
 
 1. Instale a CLI do Heroku:
+
    ```
    npm install -g heroku
    ```
 
 2. Faça login na sua conta:
+
    ```
    heroku login
    ```
 
 3. Crie um novo app:
+
    ```
    heroku create seu-app-name
    ```
 
 4. Configure as variáveis de ambiente:
+
    ```
    heroku config:set AWS_ACCESS_KEY_ID=seu_access_key_id
    heroku config:set AWS_SECRET_ACCESS_KEY=sua_secret_access_key
@@ -98,11 +105,13 @@ Se estiver usando o Heroku, siga estes passos:
 Se estiver usando um servidor VPS, siga estes passos:
 
 1. Transfira os arquivos para o servidor:
+
    ```
    scp -r ./* usuario@seu-servidor:/caminho/para/app
    ```
 
 2. Instale as dependências:
+
    ```
    npm install --production
    ```
@@ -128,11 +137,24 @@ https://seu-servidor.com/test
 Para integrar o formulário em um site, use um iframe:
 
 ```html
-<iframe 
-  src="https://seu-servidor.com/public/integrated-form-activecampaign.html" 
-  width="100%" 
-  height="800px" 
-  frameborder="0">
+<iframe
+  src="https://mockup-generator-final.vercel.app/"
+  width="100%"
+  height="800px"
+  frameborder="0"
+>
+</iframe>
+```
+
+Ou, se você estiver usando um domínio personalizado:
+
+```html
+<iframe
+  src="https://seu-dominio.com/"
+  width="100%"
+  height="800px"
+  frameborder="0"
+>
 </iframe>
 ```
 
