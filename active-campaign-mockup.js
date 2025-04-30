@@ -458,9 +458,20 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
       return res.status(400).json({ error: "Email is required" });
     }
 
-    // Process basic lead information immediately
-    console.log("Processing basic lead information immediately...");
-    asyncProcessor.processLeadBasicInfoAsync({ email, name, phone, segmento });
+    // Process basic lead information synchronously
+    console.log("Processing basic lead information synchronously...");
+    try {
+      await activeCampaign.processLeadBasicInfo({
+        email,
+        name,
+        phone,
+        segmento,
+      });
+      console.log("Lead basic information processed successfully");
+    } catch (acError) {
+      console.error("Error processing lead basic information:", acError);
+      // Continue with the process even if this fails
+    }
 
     const mime = req.file.mimetype;
     console.log(`File type: ${mime}, size: ${req.file.size} bytes`);
@@ -859,11 +870,20 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
       console.log(`Total processing time: ${totalTime}ms`);
     }
 
-    // Update mockup URL in ActiveCampaign asynchronously if available
+    // Update mockup URL in ActiveCampaign synchronously if available
     if (mockupUrl) {
-      console.log("Updating mockup URL in ActiveCampaign asynchronously...");
+      console.log("Updating mockup URL in ActiveCampaign synchronously...");
       console.log("Mockup URL to update:", mockupUrl);
-      asyncProcessor.updateMockupUrlAsync(email, mockupUrl);
+      try {
+        await activeCampaign.updateLeadMockupUrl(email, mockupUrl);
+        console.log("Mockup URL updated successfully in ActiveCampaign");
+      } catch (mockupUrlError) {
+        console.error(
+          "Error updating mockup URL in ActiveCampaign:",
+          mockupUrlError
+        );
+        // Continue with the process even if this fails
+      }
     } else {
       console.log("Mockup URL is undefined, skipping ActiveCampaign update");
     }

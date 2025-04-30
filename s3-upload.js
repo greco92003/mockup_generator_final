@@ -100,14 +100,13 @@ async function uploadToS3(fileBuffer, fileName, folder = "logos") {
     console.log("- Location:", result.Location);
     console.log("- Key:", result.Key);
 
-    // Generate pre-signed URL for the uploaded file
-    const presignedUrl = await generatePresignedUrl(result.Key);
-    console.log("- Pre-signed URL:", presignedUrl.substring(0, 100) + "...");
+    // Since the bucket is now public, we'll use direct URLs instead of pre-signed URLs
+    console.log("- Direct URL:", result.Location);
 
     // Create a result object with additional information
     const uploadResult = {
-      url: presignedUrl, // Return pre-signed URL instead of direct URL
-      directUrl: result.Location, // Also include the direct URL for reference
+      url: result.Location, // Use direct URL since bucket is public
+      directUrl: result.Location, // Also include the direct URL for reference (same as url now)
       key: result.Key,
       contentType: contentType,
       fileExtension: fileExtension,

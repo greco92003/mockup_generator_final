@@ -852,10 +852,9 @@ async function processLeadWithMockup(leadData, mockup_url) {
  * Update logo URL for an existing contact
  * @param {string} email - Email of the contact
  * @param {string} logo_url - URL of the original logo
- * @param {boolean} usePresignedUrl - Whether to generate a pre-signed URL for the logo
  * @returns {Promise<object>} - Result of the operation
  */
-async function updateLeadLogoUrl(email, logo_url, usePresignedUrl = true) {
+async function updateLeadLogoUrl(email, logo_url) {
   try {
     console.log(
       `Atualizando URL do logotipo original para o contato com email: ${email}`
@@ -930,33 +929,9 @@ async function updateLeadLogoUrl(email, logo_url, usePresignedUrl = true) {
 
     console.log(`Usando campo mockup_logotipo com ID: ${logoField.id}`);
 
-    // Generate pre-signed URL if requested
+    // Since the bucket is now public, we'll use direct URLs instead of pre-signed URLs
     let finalLogoUrl = logo_url;
-    if (usePresignedUrl && logo_url.includes("s3.amazonaws.com")) {
-      try {
-        // Import the s3Upload module dynamically to avoid circular dependencies
-        const s3Upload = require("./s3-upload");
-        console.log("Gerando URL pré-assinada para o logotipo...");
-
-        // Ensure we're using the latest AWS credentials
-        const AWS = require("aws-sdk");
-        AWS.config.update({
-          region: process.env.AWS_REGION || "us-east-1",
-          accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-        });
-
-        finalLogoUrl = await s3Upload.getPresignedUrlFromS3Url(logo_url);
-        console.log("URL pré-assinada gerada com sucesso");
-        console.log(
-          "URL pré-assinada (primeiros 100 caracteres):",
-          finalLogoUrl.substring(0, 100) + "..."
-        );
-      } catch (presignError) {
-        console.error("Erro ao gerar URL pré-assinada:", presignError);
-        console.log("Usando URL original do logotipo");
-      }
-    }
+    console.log("Usando URL direta do S3 (bucket público):", finalLogoUrl);
 
     // Update custom field with logo URL
     console.log(
