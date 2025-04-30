@@ -464,6 +464,21 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
 
     const mime = req.file.mimetype;
     console.log(`File type: ${mime}, size: ${req.file.size} bytes`);
+    console.log(`Original filename: ${req.file.originalname}`);
+    console.log(
+      `File extension: ${req.file.originalname.split(".").pop().toLowerCase()}`
+    );
+
+    // Log more detailed information about the file
+    if (mime === "image/jpeg") {
+      console.log("Processing JPEG image file");
+    } else if (mime === "image/png") {
+      console.log("Processing PNG image file");
+    } else if (mime === "application/pdf") {
+      console.log("Processing PDF document file");
+    } else {
+      console.log(`Processing unknown file type: ${mime}`);
+    }
 
     let logoBuffer = req.file.buffer;
     let logoFilename = req.file.originalname;
@@ -578,6 +593,19 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
 
       // Upload logo to S3
       console.log("Uploading logo to S3...");
+      console.log(`File to upload: ${logoFilename}, MIME type: ${mime}`);
+      console.log(`File size: ${logoBuffer.length} bytes`);
+
+      // For JPEG files, ensure we're using the correct extension
+      if (
+        mime === "image/jpeg" &&
+        !logoFilename.toLowerCase().endsWith(".jpg") &&
+        !logoFilename.toLowerCase().endsWith(".jpeg")
+      ) {
+        console.log(`Adding .jpg extension to filename: ${logoFilename}`);
+        logoFilename = `${logoFilename}.jpg`;
+      }
+
       const uploadPromise = s3Upload.uploadToS3(
         logoBuffer,
         logoFilename,
@@ -588,6 +616,7 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
       const uploadResult = await uploadPromise;
       logoUrl = uploadResult.url;
       console.log(`Logo uploaded to S3: ${logoUrl}`);
+      console.log(`S3 upload result: ${JSON.stringify(uploadResult)}`);
 
       // Store the original logo URL in ActiveCampaign
       console.log(

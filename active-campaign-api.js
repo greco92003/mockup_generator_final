@@ -862,6 +862,40 @@ async function updateLeadLogoUrl(email, logo_url, usePresignedUrl = true) {
     );
     console.log("Logo URL original:", logo_url);
 
+    // Log more detailed information about the logo URL
+    if (logo_url) {
+      console.log(`Logo URL length: ${logo_url.length}`);
+      console.log(`Logo URL starts with: ${logo_url.substring(0, 50)}...`);
+
+      // Check if it's an S3 URL
+      if (logo_url.includes("s3.amazonaws.com")) {
+        console.log("Logo URL is an S3 URL");
+
+        // Try to extract the file extension from the URL
+        const urlParts = logo_url.split(".");
+        if (urlParts.length > 1) {
+          const extension = urlParts[urlParts.length - 1]
+            .split("?")[0]
+            .toLowerCase();
+          console.log(`Detected file extension from URL: ${extension}`);
+
+          if (extension === "jpg" || extension === "jpeg") {
+            console.log("Logo appears to be a JPG/JPEG file");
+          } else if (extension === "png") {
+            console.log("Logo appears to be a PNG file");
+          } else if (extension === "pdf") {
+            console.log("Logo appears to be a PDF file");
+          } else {
+            console.log(`Logo has unknown extension: ${extension}`);
+          }
+        } else {
+          console.log("Could not detect file extension from URL");
+        }
+      } else {
+        console.log("Logo URL is not an S3 URL");
+      }
+    }
+
     // Verificar se temos todos os dados necessários
     if (!email) {
       console.error("Email não fornecido para atualização do logo URL");

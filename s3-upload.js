@@ -28,20 +28,56 @@ const DEFAULT_EXPIRATION = 7 * 24 * 60 * 60;
 async function uploadToS3(fileBuffer, fileName, folder = "logos") {
   try {
     console.log(`Uploading file to S3: ${fileName}`);
+    console.log(`File extension: ${fileName.split(".").pop().toLowerCase()}`);
+    console.log(
+      `File type: ${
+        fileName.split(".").pop().toLowerCase() === "jpg" ||
+        fileName.split(".").pop().toLowerCase() === "jpeg"
+          ? "JPEG Image"
+          : fileName.split(".").pop().toLowerCase() === "png"
+          ? "PNG Image"
+          : fileName.split(".").pop().toLowerCase() === "pdf"
+          ? "PDF Document"
+          : "Unknown"
+      }`
+    );
 
     // Generate a unique ID for the file
     const fileId = uuidv4();
     const fileExtension = fileName.split(".").pop().toLowerCase();
     const key = `${folder}/${fileId}.${fileExtension}`;
 
+    // Determine the correct content type
+    let contentType;
+    if (fileExtension === "jpg" || fileExtension === "jpeg") {
+      contentType = "image/jpeg";
+      console.log(`Setting content type for JPG/JPEG file: ${contentType}`);
+    } else if (fileExtension === "png") {
+      contentType = "image/png";
+      console.log(`Setting content type for PNG file: ${contentType}`);
+    } else if (fileExtension === "pdf") {
+      contentType = "application/pdf";
+      console.log(`Setting content type for PDF file: ${contentType}`);
+    } else {
+      contentType = `image/${fileExtension}`;
+      console.log(`Setting content type for other file type: ${contentType}`);
+    }
+
     // Upload parameters
     const params = {
       Bucket: process.env.S3_BUCKET || "mockup-hudlab",
       Key: key,
       Body: fileBuffer,
-      ContentType: `image/${fileExtension === "jpg" ? "jpeg" : fileExtension}`,
+      ContentType: contentType,
       // ACL removed as the bucket does not support ACLs
     };
+
+    // Log the upload parameters
+    console.log(`S3 upload parameters:
+    - Bucket: ${params.Bucket}
+    - Key: ${params.Key}
+    - ContentType: ${params.ContentType}
+    - File size: ${fileBuffer.length} bytes`);
 
     // Upload to S3
     const result = await s3.upload(params).promise();
