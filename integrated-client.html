@@ -397,7 +397,11 @@
         </form>
       </div>
 
-      <!-- Elementos de loading e resultado removidos, pois agora redirecionamos imediatamente -->
+      <!-- Indicador de carregamento -->
+      <div class="loading" id="loadingIndicator">
+        <div class="loading-spinner"></div>
+        <p>Processando seu pedido, por favor aguarde...</p>
+      </div>
     </div>
 
     <script>
@@ -408,6 +412,7 @@
         const logoError = document.getElementById("logoError");
         const fileInput = document.getElementById("logo");
         const fileName = document.getElementById("fileName");
+        const loadingIndicator = document.getElementById("loadingIndicator");
 
         // Update file name when file is selected
         fileInput.addEventListener("change", function () {
@@ -481,9 +486,17 @@
             document.getElementById("segmento").value
           );
 
-          // Armazenar os dados do formulário em localStorage para envio após redirecionamento
+          // Adicionar um indicador de carregamento antes de enviar o formulário
+          const submitBtn = document.getElementById("submitBtn");
+          const originalButtonText = submitBtn.textContent;
+          submitBtn.textContent = "Enviando...";
+          submitBtn.disabled = true;
+
+          // Mostrar o indicador de carregamento
+          loadingIndicator.style.display = "block";
+
           try {
-            // Não podemos armazenar o arquivo diretamente no localStorage, então vamos apenas salvar os outros dados
+            // Armazenar os dados do formulário em localStorage como backup
             const formDataToStore = {
               name: document.getElementById("name").value,
               email: email,
@@ -498,61 +511,57 @@
               JSON.stringify(formDataToStore)
             );
 
-            // Criar um blob com o arquivo para upload
-            const fileBlob = new Blob([logoFile], { type: logoFile.type });
+            console.log("Enviando formulário e aguardando resposta...");
 
-            // Redirecionar imediatamente para a página de agradecimento
-            console.log("Redirecionando para página de agradecimento...");
-
-            // Iniciar o upload em segundo plano usando sendBeacon se disponível
+            // Definir o endpoint
             const endpoint = "/api/mockup";
 
-            if (navigator.sendBeacon) {
-              console.log("Usando sendBeacon para envio em segundo plano");
-              // Infelizmente sendBeacon não suporta FormData com arquivos, então vamos usar fetch
-              // mas não vamos esperar pela resposta
-              fetch(endpoint, {
-                method: "POST",
-                body: formData,
-                // Configurar para não esperar pela resposta
-                keepalive: true,
-              }).catch((err) => {
-                console.log(
-                  "Erro no envio em segundo plano, mas o usuário já foi redirecionado:",
-                  err
-                );
-              });
-            } else {
-              console.log("sendBeacon não disponível, usando fetch");
-              // Iniciar o fetch mas não esperar pela resposta
-              fetch(endpoint, {
-                method: "POST",
-                body: formData,
-                keepalive: true,
-              }).catch((err) => {
-                console.log(
-                  "Erro no envio em segundo plano, mas o usuário já foi redirecionado:",
-                  err
-                );
-              });
-            }
+            // Enviar o formulário e aguardar a resposta
+            const response = await fetch(endpoint, {
+              method: "POST",
+              body: formData,
+            });
 
-            // Redirecionar imediatamente na janela principal, sem esperar pelo fetch
-            window.top.location.href =
-              "https://hudlab.com.br/obrigado-amostra-digital2";
+            if (response.ok) {
+              console.log("Formulário enviado com sucesso!");
+              const data = await response.json();
+              console.log("Resposta do servidor:", data);
+
+              // Redirecionar para a página de agradecimento após receber a resposta
+              window.top.location.href =
+                "https://hudlab.com.br/obrigado-amostra-digital2";
+            } else {
+              console.error(
+                "Erro ao enviar formulário:",
+                await response.text()
+              );
+              alert(
+                "Ocorreu um erro ao processar o formulário. Por favor, tente novamente."
+              );
+
+              // Restaurar o botão
+              submitBtn.textContent = originalButtonText;
+              submitBtn.disabled = false;
+
+              // Esconder o indicador de carregamento
+              loadingIndicator.style.display = "none";
+            }
           } catch (error) {
             console.error("Erro ao processar o formulário:", error);
             alert(
               "Ocorreu um erro ao processar o formulário. Por favor, tente novamente."
             );
 
-            // Mostrar o erro mas não bloquear o usuário
-            // Redirecionar mesmo em caso de erro na janela principal
-            window.top.location.href =
-              "https://hudlab.com.br/obrigado-amostra-digital2";
+            // Restaurar o botão
+            submitBtn.textContent = originalButtonText;
+            submitBtn.disabled = false;
+
+            // Esconder o indicador de carregamento
+            loadingIndicator.style.display = "none";
+
+            // Se houver um erro crítico, ainda podemos redirecionar
+            // window.top.location.href = "https://hudlab.com.br/obrigado-amostra-digital2";
           }
-          // Este catch não é mais necessário, pois já temos um catch interno
-          // que lida com os erros e redireciona o usuário
         });
       });
     </script>
