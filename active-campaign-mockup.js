@@ -436,6 +436,8 @@ async function saveMockupToPublic(mockupPath, email) {
 
 // API endpoint for mockup generation with AWS Lambda and ActiveCampaign integration
 app.post("/api/mockup", upload.single("logo"), async (req, res) => {
+  let logoUrl = null;
+
   try {
     console.log("Received mockup generation request (AWS Lambda)");
     const { name, email, phone, segmento } = req.body;
@@ -456,8 +458,9 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
       return res.status(400).json({ error: "Email is required" });
     }
 
-    // We'll store the logo URL here once it's available
-    let logoUrl = null;
+    // Process basic lead information immediately
+    console.log("Processing basic lead information immediately...");
+    asyncProcessor.processLeadBasicInfoAsync({ email, name, phone, segmento });
 
     const mime = req.file.mimetype;
     console.log(`File type: ${mime}, size: ${req.file.size} bytes`);
@@ -508,17 +511,30 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
           `Original S3 upload result: ${JSON.stringify(originalUploadResult)}`
         );
 
-        // Store the original PDF URL for later use with ActiveCampaign
-        console.log("Armazenando URL do PDF original para uso posterior...");
-        // Use the direct URL from the upload result to ensure it's uncompressed
-        const originalDirectUrl =
-          originalUploadResult.directUrl || originalPdfUrl;
+        // Store the original PDF URL in ActiveCampaign
         console.log(
-          `Using original uncompressed PDF URL: ${originalDirectUrl}`
+          "Armazenando URL do PDF original no campo mockup_logotipo..."
         );
+        try {
+          // Use the direct URL from the upload result to ensure it's uncompressed
+          const originalDirectUrl =
+            originalUploadResult.directUrl || originalPdfUrl;
+          console.log(
+            `Using original uncompressed PDF URL: ${originalDirectUrl}`
+          );
 
-        // Save the logo URL for later use
-        logoUrl = originalDirectUrl;
+          // Update the mockup_logotipo field with the original PDF URL
+          await activeCampaign.updateLeadLogoUrl(email, originalDirectUrl);
+          console.log(
+            "Campo mockup_logotipo atualizado com sucesso com URL do PDF original"
+          );
+        } catch (logoUrlError) {
+          console.error(
+            "Erro ao atualizar campo mockup_logotipo no ActiveCampaign com PDF original:",
+            logoUrlError
+          );
+          // Continue with the process even if this update fails
+        }
       } catch (pdfUploadError) {
         console.error("Error uploading original PDF to S3:", pdfUploadError);
         // Continue with the conversion process even if the original upload fails
@@ -609,29 +625,50 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
       const cacheStats = mockupCache.getStats();
       console.log(`Mockup cache statistics: ${JSON.stringify(cacheStats)}`);
 
-      // Store the original logo URL for later use with ActiveCampaign
+      // Store the original logo URL in ActiveCampaign even when using cached mockup
       console.log(
-        "Preparando URL do logotipo original para uso posterior (do cache)..."
+        "Armazenando URL do logotipo original no campo mockup_logotipo (do cache)..."
       );
+      try {
+        // Check if this is a PNG or PDF file (we want to ensure it's uncompressed)
+        if (mime === "image/png" || mime === "application/pdf") {
+          console.log(
+            `${
+              mime === "image/png" ? "PNG" : "PDF"
+            } file detected - ensuring original uncompressed URL is used for mockup_logotipo field (from cache)`
+          );
 
-      // Check if this is a PNG or PDF file (we want to ensure it's uncompressed)
-      if (mime === "image/png" || mime === "application/pdf") {
-        console.log(
-          `${
-            mime === "image/png" ? "PNG" : "PDF"
-          } file detected - ensuring original uncompressed URL is used (from cache)`
-        );
+          // For cached files, we need to extract the direct URL from the cached logoUrl
+          // This is a bit tricky since we don't have the original upload result
+          // Let's try to get the direct URL by removing any query parameters
+          let originalLogoUrl = logoUrl;
+          if (logoUrl.includes("?")) {
+            originalLogoUrl = logoUrl.split("?")[0];
+            console.log(
+              `Extracted original URL from cached URL: ${originalLogoUrl}`
+            );
+          }
 
-        // For cached files, we need to extract the direct URL from the cached logoUrl
-        // This is a bit tricky since we don't have the original upload result
-        // Let's try to get the direct URL by removing any query parameters
-        if (logoUrl.includes("?")) {
-          logoUrl = logoUrl.split("?")[0];
-          console.log(`Extracted original URL from cached URL: ${logoUrl}`);
+          // Use the dedicated function to update the logo URL with the original uncompressed URL
+          await activeCampaign.updateLeadLogoUrl(email, originalLogoUrl);
+          console.log(
+            `Campo mockup_logotipo atualizado com sucesso com URL original não comprimida do ${
+              mime === "image/png" ? "PNG" : "PDF"
+            } (do cache)`
+          );
+        } else {
+          // For other file types, use the standard URL
+          await activeCampaign.updateLeadLogoUrl(email, logoUrl);
+          console.log(
+            "Campo mockup_logotipo atualizado com sucesso (do cache)"
+          );
         }
-      } else {
-        // For other file types, use the standard URL
-        console.log("Using standard URL for logo (from cache):", logoUrl);
+      } catch (logoUrlError) {
+        console.error(
+          "Erro ao atualizar campo mockup_logotipo no ActiveCampaign (do cache):",
+          logoUrlError
+        );
+        // Continue with the process even if this update fails
       }
     } else {
       // Start timer for performance measurement
@@ -667,30 +704,48 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
       console.log(`Logo uploaded to S3: ${logoUrl}`);
       console.log(`S3 upload result: ${JSON.stringify(uploadResult)}`);
 
-      // Store the original logo URL for later use with ActiveCampaign
-      console.log("Armazenando URL do logotipo original para uso posterior...");
+      // Store the original logo URL in ActiveCampaign
+      console.log(
+        "Armazenando URL do logotipo original no campo mockup_logotipo..."
+      );
+      try {
+        // Check if this is a PNG file (we want to ensure it's uncompressed)
+        // Note: For PDF files, we already updated the mockup_logotipo field earlier in the process
+        if (mime === "image/png") {
+          console.log(
+            "PNG file detected - ensuring original uncompressed URL is used for mockup_logotipo field"
+          );
+          console.log(
+            `Original upload result: ${JSON.stringify(uploadResult)}`
+          );
 
-      // Check if this is a PNG file (we want to ensure it's uncompressed)
-      if (mime === "image/png") {
-        console.log(
-          "PNG file detected - ensuring original uncompressed URL is used"
+          // Make sure we're using the direct URL from the upload result
+          const originalLogoUrl = uploadResult.directUrl || logoUrl;
+          console.log(
+            `Using original uncompressed PNG URL: ${originalLogoUrl}`
+          );
+
+          // Use the dedicated function to update the logo URL with the original uncompressed URL
+          await activeCampaign.updateLeadLogoUrl(email, originalLogoUrl);
+          console.log(
+            "Campo mockup_logotipo atualizado com sucesso com URL original não comprimida"
+          );
+        } else if (mime === "application/pdf") {
+          // For PDF files, we already updated the mockup_logotipo field earlier in the process
+          console.log(
+            "PDF file detected - mockup_logotipo field already updated with original PDF URL"
+          );
+        } else {
+          // For other file types, use the standard URL
+          await activeCampaign.updateLeadLogoUrl(email, logoUrl);
+          console.log("Campo mockup_logotipo atualizado com sucesso");
+        }
+      } catch (logoUrlError) {
+        console.error(
+          "Erro ao atualizar campo mockup_logotipo no ActiveCampaign:",
+          logoUrlError
         );
-        console.log(`Original upload result: ${JSON.stringify(uploadResult)}`);
-
-        // Make sure we're using the direct URL from the upload result
-        const originalLogoUrl = uploadResult.directUrl || logoUrl;
-        console.log(`Using original uncompressed PNG URL: ${originalLogoUrl}`);
-
-        // Save the logo URL for later use
-        logoUrl = originalLogoUrl;
-      } else if (mime === "application/pdf") {
-        // For PDF files, we already set the logoUrl earlier in the process
-        console.log(
-          "PDF file detected - logo URL already set with original PDF URL"
-        );
-      } else {
-        // For other file types, use the standard URL
-        console.log("Using standard URL for logo:", logoUrl);
+        // Continue with the process even if this update fails
       }
 
       // Generate mockup using AWS Lambda
@@ -804,21 +859,13 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
       console.log(`Total processing time: ${totalTime}ms`);
     }
 
-    // Process lead information with logo URL
-    console.log("Processing lead information with logo URL...");
-    console.log("Logo URL to use:", logoUrl);
-    asyncProcessor.processLeadBasicInfoAsync(
-      { email, name, phone, segmento },
-      logoUrl
-    );
-
     // Update mockup URL in ActiveCampaign asynchronously if available
     if (mockupUrl) {
       console.log("Updating mockup URL in ActiveCampaign asynchronously...");
       console.log("Mockup URL to update:", mockupUrl);
       asyncProcessor.updateMockupUrlAsync(email, mockupUrl);
     } else {
-      console.log("Mockup URL is undefined, skipping mockup URL update");
+      console.log("Mockup URL is undefined, skipping ActiveCampaign update");
     }
 
     // Return the result with WhatsApp redirect URL
