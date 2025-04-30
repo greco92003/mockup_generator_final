@@ -20,14 +20,20 @@ const API_KEY = process.env.AWS_API_KEY || "";
  * @param {string} logoUrl - URL of the logo (must be publicly accessible)
  * @param {string} email - Email of the user
  * @param {string} name - Name of the user
+ * @param {string} fileType - Type of the logo file (pdf, png, jpg)
  * @returns {Promise<string>} - URL of the generated mockup
  */
-async function generateMockupWithLambda(logoUrl, email, name) {
+async function generateMockupWithLambda(logoUrl, email, name, fileType = "") {
   try {
     console.log("Generating mockup with AWS Lambda...");
     console.log("Logo URL:", logoUrl);
     console.log("Email:", email);
     console.log("Name:", name);
+    console.log("File Type:", fileType);
+
+    // Determine if this is a PDF file that needs conversion
+    const isPdf = fileType === "pdf" || logoUrl.toLowerCase().includes(".pdf");
+    console.log("Is PDF file that needs conversion:", isPdf);
 
     // Prepare headers with API key if available
     const headers = {};
@@ -38,7 +44,7 @@ async function generateMockupWithLambda(logoUrl, email, name) {
     // Call the Lambda function via API Gateway with shorter timeout
     console.log("Calling Lambda function at:", LAMBDA_API_ENDPOINT);
     console.log("With headers:", headers);
-    console.log("With payload:", { logoUrl, email, name });
+    console.log("With payload:", { logoUrl, email, name, isPdf });
 
     // Start timer for performance measurement
     const lambdaStartTime = Date.now();
@@ -53,6 +59,7 @@ async function generateMockupWithLambda(logoUrl, email, name) {
             logoUrl,
             email,
             name,
+            isPdf, // Add the isPdf flag to inform Lambda if conversion is needed
           },
           {
             headers,

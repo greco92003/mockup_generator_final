@@ -80,29 +80,46 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
     );
     console.log(`Folder: ${originalUploadResult.folder}`);
 
-    // Upload the same file to logos folder for processing
-    console.log("Uploading logo to S3 logos folder for processing...");
-    const logoUploadResult = await s3Upload.uploadToS3(
-      logoBuffer,
-      logoFilename,
-      "logos",
-      false // Not marked as uncompressed original
-    );
+    let logoUrl;
 
-    // Get the logo URL for mockup generation
-    const logoUrl = logoUploadResult.url;
-    console.log(`Logo uploaded to S3 logos folder: ${logoUrl}`);
-    console.log(`Folder: ${logoUploadResult.folder}`);
+    // For PDF files, we need to convert to PNG before uploading to logos folder
+    if (mime === "application/pdf") {
+      console.log(
+        "PDF file detected. Will convert to PNG before uploading to logos folder"
+      );
+
+      // We'll handle the conversion and upload to logos folder in the Lambda function
+      // Just use the original URL for now, Lambda will handle the conversion
+      logoUrl = originalLogoUrl;
+    } else {
+      // For non-PDF files (PNG, JPG), upload directly to logos folder for processing
+      console.log("Uploading logo to S3 logos folder for processing...");
+      const logoUploadResult = await s3Upload.uploadToS3(
+        logoBuffer,
+        logoFilename,
+        "logos",
+        false // Not marked as uncompressed original
+      );
+
+      // Get the logo URL for mockup generation
+      logoUrl = logoUploadResult.url;
+      console.log(`Logo uploaded to S3 logos folder: ${logoUrl}`);
+      console.log(`Folder: ${logoUploadResult.folder}`);
+    }
 
     // Process the logo to generate mockup using AWS Lambda
     console.log("Generating mockup with AWS Lambda...");
     let mockupUrl;
 
     try {
+      // Extract file extension from the original filename
+      const fileExtension = logoFilename.split(".").pop().toLowerCase();
+
       mockupUrl = await awsLambdaConfig.generateMockupWithLambda(
         logoUrl,
         email,
-        name
+        name,
+        fileExtension // Pass the file extension to inform Lambda about file type
       );
 
       console.log(`Mockup generated with AWS Lambda: ${mockupUrl}`);
