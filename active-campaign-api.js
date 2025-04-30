@@ -500,7 +500,7 @@ async function findOrCreateList(listName) {
 
 /**
  * Process basic lead information (without mockup URL)
- * @param {object} leadData - Lead data (email, name, phone, segmento)
+ * @param {object} leadData - Lead data (email, name, phone, segmento, logo_url)
  * @returns {Promise<object>} - Result of the operation with contact information
  */
 async function processLeadBasicInfo(leadData) {
@@ -510,7 +510,7 @@ async function processLeadBasicInfo(leadData) {
       JSON.stringify(leadData)
     );
 
-    const { email, name, phone, segmento } = leadData;
+    const { email, name, phone, segmento, logo_url } = leadData;
 
     // Verificar se temos todos os dados necessários
     if (!email) {
@@ -579,6 +579,91 @@ async function processLeadBasicInfo(leadData) {
       console.log("Campo Segmento de Negócio atualizado com sucesso");
     } else {
       console.log("Segmento não fornecido, pulando processamento deste campo");
+    }
+
+    // Process logo_url field if provided
+    if (logo_url) {
+      console.log(
+        `Processando campo logo_url com valor: ${logo_url.substring(0, 50)}...`
+      );
+
+      // Update the mockup_logotipo field with the logo URL
+      console.log(
+        `Atualizando campo mockup_logotipo para contato ${contact.id}`
+      );
+      try {
+        // Use the known field ID directly (ID: 42, Título: mockup_logotipo, Tipo: text)
+        console.log("Usando ID conhecido do campo mockup_logotipo (ID: 42)...");
+
+        // Create a logoField object with the known information
+        const logoField = {
+          id: 42,
+          title: "mockup_logotipo",
+          type: "text",
+        };
+
+        // Update custom field with logo URL
+        console.log(
+          `Atualizando campo "${logoField.title}" (ID: ${logoField.id}) para contato ${contact.id}`
+        );
+
+        // Try the standard approach first
+        try {
+          console.log("Tentando atualizar campo usando abordagem padrão...");
+          const updatedField = await updateContactCustomField(
+            contact.id,
+            logoField.id,
+            logo_url
+          );
+          console.log(
+            `Campo "${logoField.title}" atualizado com sucesso (abordagem padrão):`,
+            JSON.stringify(updatedField)
+          );
+        } catch (updateError) {
+          console.error("Erro na atualização padrão:", updateError);
+
+          // Try a direct API call as a fallback
+          try {
+            console.log("Tentando atualização direta via API...");
+            const directResponse = await fetch(
+              `${AC_API_URL}/api/3/fieldValues`,
+              {
+                method: "POST",
+                headers: {
+                  "Api-Token": AC_API_KEY,
+                  "Content-Type": "application/json",
+                  Accept: "application/json",
+                },
+                body: JSON.stringify({
+                  fieldValue: {
+                    contact: contact.id,
+                    field: 42, // Hardcoded ID for mockup_logotipo
+                    value: logo_url,
+                  },
+                }),
+              }
+            );
+
+            const directData = await directResponse.json();
+
+            if (directData.fieldValue) {
+              console.log(
+                "Campo atualizado com sucesso via API direta:",
+                directData.fieldValue
+              );
+            } else {
+              console.error("Falha na atualização direta:", directData);
+            }
+          } catch (directError) {
+            console.error("Erro na atualização direta:", directError);
+          }
+        }
+      } catch (logoError) {
+        console.error("Erro ao atualizar campo mockup_logotipo:", logoError);
+        // Continue with the process even if this update fails
+      }
+    } else {
+      console.log("Logo URL não fornecido, pulando processamento deste campo");
     }
 
     // Find or create list for mockup leads

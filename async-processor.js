@@ -64,11 +64,22 @@ async function processQueue() {
 /**
  * Process basic lead information in ActiveCampaign asynchronously
  * @param {Object} leadData - Lead data (email, name, phone, segmento)
+ * @param {string} [logo_url] - URL of the original logo (optional)
  */
-async function processLeadBasicInfoAsync(leadData) {
+async function processLeadBasicInfoAsync(leadData, logo_url) {
   console.log(
     "Adicionando tarefa de processamento de dados básicos do lead à fila assíncrona..."
   );
+
+  // If logo_url is provided as a separate parameter, add it to leadData
+  if (logo_url && !leadData.logo_url) {
+    leadData.logo_url = logo_url;
+    console.log(
+      "Logo URL adicionado aos dados do lead:",
+      logo_url.substring(0, 50) + "..."
+    );
+  }
+
   console.log("Dados do lead:", JSON.stringify(leadData));
 
   addTask(
