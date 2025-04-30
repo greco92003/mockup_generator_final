@@ -574,9 +574,35 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
         "Armazenando URL do logotipo original no campo mockup_logotipo (do cache)..."
       );
       try {
-        // Use the dedicated function to update the logo URL
-        await activeCampaign.updateLeadLogoUrl(email, logoUrl);
-        console.log("Campo mockup_logotipo atualizado com sucesso (do cache)");
+        // Check if this is a PNG file (we want to ensure it's uncompressed)
+        if (mime === "image/png") {
+          console.log(
+            "PNG file detected - ensuring original uncompressed URL is used for mockup_logotipo field (from cache)"
+          );
+
+          // For cached PNG files, we need to extract the direct URL from the cached logoUrl
+          // This is a bit tricky since we don't have the original upload result
+          // Let's try to get the direct URL by removing any query parameters
+          let originalLogoUrl = logoUrl;
+          if (logoUrl.includes("?")) {
+            originalLogoUrl = logoUrl.split("?")[0];
+            console.log(
+              `Extracted original URL from cached URL: ${originalLogoUrl}`
+            );
+          }
+
+          // Use the dedicated function to update the logo URL with the original uncompressed URL
+          await activeCampaign.updateLeadLogoUrl(email, originalLogoUrl);
+          console.log(
+            "Campo mockup_logotipo atualizado com sucesso com URL original não comprimida (do cache)"
+          );
+        } else {
+          // For other file types, use the standard URL
+          await activeCampaign.updateLeadLogoUrl(email, logoUrl);
+          console.log(
+            "Campo mockup_logotipo atualizado com sucesso (do cache)"
+          );
+        }
       } catch (logoUrlError) {
         console.error(
           "Erro ao atualizar campo mockup_logotipo no ActiveCampaign (do cache):",
@@ -623,9 +649,31 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
         "Armazenando URL do logotipo original no campo mockup_logotipo..."
       );
       try {
-        // Use the dedicated function to update the logo URL
-        await activeCampaign.updateLeadLogoUrl(email, logoUrl);
-        console.log("Campo mockup_logotipo atualizado com sucesso");
+        // Check if this is a PNG file (we want to ensure it's uncompressed)
+        if (mime === "image/png") {
+          console.log(
+            "PNG file detected - ensuring original uncompressed URL is used for mockup_logotipo field"
+          );
+          console.log(
+            `Original upload result: ${JSON.stringify(uploadResult)}`
+          );
+
+          // Make sure we're using the direct URL from the upload result
+          const originalLogoUrl = uploadResult.directUrl || logoUrl;
+          console.log(
+            `Using original uncompressed PNG URL: ${originalLogoUrl}`
+          );
+
+          // Use the dedicated function to update the logo URL with the original uncompressed URL
+          await activeCampaign.updateLeadLogoUrl(email, originalLogoUrl);
+          console.log(
+            "Campo mockup_logotipo atualizado com sucesso com URL original não comprimida"
+          );
+        } else {
+          // For other file types, use the standard URL
+          await activeCampaign.updateLeadLogoUrl(email, logoUrl);
+          console.log("Campo mockup_logotipo atualizado com sucesso");
+        }
       } catch (logoUrlError) {
         console.error(
           "Erro ao atualizar campo mockup_logotipo no ActiveCampaign:",

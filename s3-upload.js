@@ -72,12 +72,23 @@ async function uploadToS3(fileBuffer, fileName, folder = "logos") {
       // ACL removed as the bucket does not support ACLs
     };
 
+    // For PNG files, ensure no compression is applied
+    if (fileExtension === "png") {
+      console.log("PNG file detected - ensuring no compression is applied");
+      // Add metadata to indicate this is an uncompressed PNG
+      params.Metadata = {
+        uncompressed: "true",
+        "original-filename": fileName,
+      };
+    }
+
     // Log the upload parameters
     console.log(`S3 upload parameters:
     - Bucket: ${params.Bucket}
     - Key: ${params.Key}
     - ContentType: ${params.ContentType}
-    - File size: ${fileBuffer.length} bytes`);
+    - File size: ${fileBuffer.length} bytes
+    - Metadata: ${params.Metadata ? JSON.stringify(params.Metadata) : "None"}`);
 
     // Upload to S3
     const result = await s3.upload(params).promise();
@@ -90,11 +101,21 @@ async function uploadToS3(fileBuffer, fileName, folder = "logos") {
     const presignedUrl = await generatePresignedUrl(result.Key);
     console.log("- Pre-signed URL:", presignedUrl.substring(0, 100) + "...");
 
-    return {
+    // Create a result object with additional information
+    const uploadResult = {
       url: presignedUrl, // Return pre-signed URL instead of direct URL
       directUrl: result.Location, // Also include the direct URL for reference
       key: result.Key,
+      contentType: contentType,
+      fileExtension: fileExtension,
+      isOriginalUncompressed:
+        fileExtension === "png" || fileExtension === "pdf", // Flag to indicate if this is an uncompressed original
+      originalFileName: fileName,
     };
+
+    console.log(`S3 upload result: ${JSON.stringify(uploadResult, null, 2)}`);
+
+    return uploadResult;
   } catch (error) {
     console.error("Error uploading to S3:", error);
     throw error;
