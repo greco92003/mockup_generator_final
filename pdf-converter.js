@@ -35,6 +35,22 @@ async function pdfBufferToPng(buffer, filename = "logo.pdf") {
   try {
     console.log("Starting PDF to PNG conversion with CloudConvert...");
 
+    // Definir metadados que queremos adicionar ao arquivo
+    const customMetadata = {
+      "is-original": "false",
+      uncompressed: "false",
+      "file-type": "png",
+      "original-filename": filename.replace(/\.pdf$/i, ".png"),
+      "converted-from": filename,
+      "conversion-source": "pdf",
+      "conversion-type": "cloudconvert",
+    };
+
+    console.log(
+      "Custom metadata to be added:",
+      JSON.stringify(customMetadata, null, 2)
+    );
+
     // Create job (upload + convert + export)
     const job = await cloudConvert.jobs.create({
       tasks: {
@@ -55,15 +71,7 @@ async function pdfBufferToPng(buffer, filename = "logo.pdf") {
         add_metadata: {
           operation: "metadata/write",
           input: "convert_logo",
-          metadata: {
-            "is-original": "false",
-            uncompressed: "false",
-            "file-type": "png",
-            "original-filename": filename.replace(/\.pdf$/i, ".png"),
-            "converted-from": filename,
-            "conversion-source": "pdf",
-            "conversion-type": "cloudconvert",
-          },
+          metadata: customMetadata,
         },
         export_logo: { operation: "export/url", input: "add_metadata" },
       },
@@ -86,20 +94,77 @@ async function pdfBufferToPng(buffer, filename = "logo.pdf") {
     const completed = await cloudConvert.jobs.wait(job.id);
     console.log("Conversion completed");
 
+    // Log the completed job details for debugging
+    console.log(
+      "Completed job details:",
+      JSON.stringify(
+        {
+          id: completed.id,
+          status: completed.status,
+          tasks: completed.tasks.map((t) => ({
+            name: t.name,
+            operation: t.operation,
+            status: t.status,
+            result: t.result ? Object.keys(t.result) : null,
+          })),
+        },
+        null,
+        2
+      )
+    );
+
+    // Find the metadata task to check if it was successful
+    const metadataTask = completed.tasks.find((t) => t.name === "add_metadata");
+    if (metadataTask && metadataTask.status === "finished") {
+      console.log("Metadata task completed successfully");
+    } else {
+      console.warn("Metadata task may not have completed successfully");
+    }
+
     // Download the generated PNG
     const file = cloudConvert.jobs.getExportUrls(completed)[0];
-    console.log("Download URL:", file.url);
+    if (!file || !file.url) {
+      throw new Error("No export URL found in CloudConvert response");
+    }
 
+    console.log("Download URL:", file.url);
     const localPath = path.join(tempDir, file.filename);
 
+    // Download the file with proper error handling
     await new Promise((resolve, reject) => {
       const ws = fs.createWriteStream(localPath);
-      https.get(file.url, (response) => response.pipe(ws));
+      https
+        .get(file.url, (response) => {
+          if (response.statusCode !== 200) {
+            reject(
+              new Error(
+                `Failed to download file: ${response.statusCode} ${response.statusMessage}`
+              )
+            );
+            return;
+          }
+          response.pipe(ws);
+        })
+        .on("error", (err) => {
+          reject(new Error(`Network error when downloading: ${err.message}`));
+        });
+
       ws.on("finish", () => {
         console.log("File downloaded to:", localPath);
+
+        // Criar um arquivo de metadados auxiliar para garantir que os metadados sejam preservados
+        const metadataFilePath = `${localPath}.metadata.json`;
+        fs.writeFileSync(
+          metadataFilePath,
+          JSON.stringify(customMetadata, null, 2)
+        );
+        console.log(`Metadata saved to auxiliary file: ${metadataFilePath}`);
+
         resolve();
       });
-      ws.on("error", reject);
+      ws.on("error", (err) => {
+        reject(new Error(`File system error when saving: ${err.message}`));
+      });
     });
 
     return localPath;

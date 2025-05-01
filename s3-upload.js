@@ -95,21 +95,66 @@ async function uploadToS3(
       "file-type": fileExtension,
     };
 
-    // Verificar se é um arquivo PNG convertido do CloudConvert
+    // Verificar se é um arquivo PNG convertido pelo CloudConvert
     // Podemos verificar pelo nome do arquivo ou por outros indicadores
-    const isPngFromCloudConvert =
-      fileExtension === "png" &&
-      // Verificar se o nome do arquivo indica que foi convertido de PDF
-      (fileName.toLowerCase().includes("converted") ||
-        fileName.toLowerCase().includes("pdf-to-png") ||
-        // Verificar se o nome do arquivo segue o padrão de conversão (nome.pdf.png)
-        fileName.toLowerCase().match(/\.pdf\.png$/) ||
-        // Verificar se o nome do arquivo termina com -converted.png
-        fileName.toLowerCase().endsWith("-converted.png") ||
-        // Ou verificar se há metadados específicos no buffer (não é 100% confiável para arquivos binários)
-        (fileBuffer.toString().includes("converted-from") &&
-          fileBuffer.toString().includes("conversion-source") &&
-          fileBuffer.toString().includes("conversion-type")));
+    let isPngFromCloudConvert = false;
+    let metadataFromFile = null;
+
+    // Verificar se existe um arquivo de metadados auxiliar
+    const possibleMetadataFile = path.join(
+      process.cwd(),
+      "temp",
+      `${fileName}.metadata.json`
+    );
+
+    if (fs.existsSync(possibleMetadataFile)) {
+      try {
+        console.log(
+          `Found metadata file for ${fileName}: ${possibleMetadataFile}`
+        );
+        metadataFromFile = JSON.parse(
+          fs.readFileSync(possibleMetadataFile, "utf8")
+        );
+        console.log(
+          `Loaded metadata from file: ${JSON.stringify(
+            metadataFromFile,
+            null,
+            2
+          )}`
+        );
+
+        // Se o arquivo de metadados existe e contém informações de conversão, é um arquivo convertido
+        if (
+          metadataFromFile &&
+          metadataFromFile["converted-from"] &&
+          metadataFromFile["conversion-source"] === "pdf"
+        ) {
+          isPngFromCloudConvert = true;
+          console.log(
+            `Detected PNG file converted from PDF based on metadata file`
+          );
+        }
+      } catch (err) {
+        console.error(`Error reading metadata file: ${err.message}`);
+      }
+    }
+
+    // Se não encontramos um arquivo de metadados, verificar pelo nome e conteúdo
+    if (!isPngFromCloudConvert) {
+      isPngFromCloudConvert =
+        fileExtension === "png" &&
+        // Verificar se o nome do arquivo indica que foi convertido de PDF
+        (fileName.toLowerCase().includes("converted") ||
+          fileName.toLowerCase().includes("pdf-to-png") ||
+          // Verificar se o nome do arquivo segue o padrão de conversão (nome.pdf.png)
+          fileName.toLowerCase().match(/\.pdf\.png$/) ||
+          // Verificar se o nome do arquivo termina com -converted.png
+          fileName.toLowerCase().endsWith("-converted.png") ||
+          // Ou verificar se há metadados específicos no buffer (não é 100% confiável para arquivos binários)
+          (fileBuffer.toString().includes("converted-from") &&
+            fileBuffer.toString().includes("conversion-source") &&
+            fileBuffer.toString().includes("conversion-type")));
+    }
 
     // Log para depuração
     if (isPngFromCloudConvert) {
@@ -124,15 +169,42 @@ async function uploadToS3(
           `PNG file from CloudConvert detected - setting appropriate metadata`
         );
 
-        // Adicionar metadados específicos para arquivos convertidos pelo CloudConvert
-        // Usando nomes de chave em minúsculas para garantir compatibilidade
-        params.Metadata.uncompressed = "false";
-        params.Metadata["is-original"] = "false";
-        params.Metadata["converted-from"] = "pdf";
-        params.Metadata["conversion-source"] = "pdf";
-        params.Metadata["conversion-type"] = "cloudconvert";
+        // Se temos metadados do arquivo auxiliar, usá-los
+        if (metadataFromFile) {
+          console.log(`Using metadata from auxiliary file`);
 
-        console.log(`Setting metadata for CloudConvert converted PNG file`);
+          // Adicionar todos os metadados do arquivo auxiliar
+          Object.entries(metadataFromFile).forEach(([key, value]) => {
+            params.Metadata[key] = value;
+          });
+
+          console.log(`Applied metadata from auxiliary file to S3 upload`);
+        } else {
+          // Adicionar metadados específicos para arquivos convertidos pelo CloudConvert
+          // Usando nomes de chave em minúsculas para garantir compatibilidade
+          params.Metadata.uncompressed = "false";
+          params.Metadata["is-original"] = "false";
+          params.Metadata["converted-from"] = "pdf";
+          params.Metadata["conversion-source"] = "pdf";
+          params.Metadata["conversion-type"] = "cloudconvert";
+
+          console.log(
+            `Setting default metadata for CloudConvert converted PNG file`
+          );
+        }
+
+        // Garantir que estes campos estejam sempre presentes
+        params.Metadata.uncompressed = params.Metadata.uncompressed || "false";
+        params.Metadata["is-original"] =
+          params.Metadata["is-original"] || "false";
+
+        console.log(
+          `Final metadata for CloudConvert converted PNG file: ${JSON.stringify(
+            params.Metadata,
+            null,
+            2
+          )}`
+        );
       } else if (isUncompressed || folder === "logo-uncompressed") {
         console.log(
           `Original uncompressed file detected - setting appropriate metadata`
@@ -199,6 +271,26 @@ async function uploadToS3(
 
     // Since the bucket is now public, we'll use direct URLs instead of pre-signed URLs
     console.log("- Direct URL:", result.Location);
+
+    // Verificar se os metadados foram aplicados corretamente
+    try {
+      console.log("Verifying metadata was applied correctly...");
+      const headParams = {
+        Bucket: params.Bucket,
+        Key: params.Key,
+      };
+
+      const headResult = await s3.headObject(headParams).promise();
+
+      if (headResult.Metadata) {
+        console.log("Metadata successfully applied to S3 object:");
+        console.log(JSON.stringify(headResult.Metadata, null, 2));
+      } else {
+        console.warn("No metadata found on S3 object after upload");
+      }
+    } catch (metadataError) {
+      console.warn(`Could not verify metadata: ${metadataError.message}`);
+    }
 
     // Create a result object with additional information
     const uploadResult = {
