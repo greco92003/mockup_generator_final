@@ -7,9 +7,6 @@ import urllib.parse
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 import urllib.request
-import requests
-import tempfile
-import uuid
 
 # Configurações
 S3_BUCKET = os.environ.get('S3_BUCKET', 'mockup-hudlab')
@@ -73,6 +70,24 @@ def upload_image_to_s3(image_bytes, bucket, key, content_type='image/png', is_or
         if original_filename:
             metadata["original-filename"] = original_filename
 
+        # Verificar se o arquivo é um PNG convertido do PDF
+        is_converted_png = False
+        if key.endswith('.png'):
+            # Verificar se o nome do arquivo indica que foi convertido de PDF
+            if original_filename and (
+                original_filename.lower().endswith('-converted.png') or
+                '.pdf.png' in original_filename.lower() or
+                'pdf-to-png' in original_filename.lower() or
+                'converted-from' in str(metadata)
+            ):
+                is_converted_png = True
+                metadata["is-original"] = "false"
+                metadata["uncompressed"] = "false"
+                metadata["converted-from"] = "pdf"
+                metadata["conversion-source"] = "pdf"
+                metadata["conversion-type"] = "cloudconvert"
+                print(f"Detected PNG file converted from PDF: {original_filename}")
+
         # Determinar se o arquivo está na pasta logo-uncompressed
         is_in_uncompressed = 'logo-uncompressed/' in key
 
@@ -81,7 +96,7 @@ def upload_image_to_s3(image_bytes, bucket, key, content_type='image/png', is_or
             metadata["is-original"] = "true"
             metadata["uncompressed"] = "true"
 
-        print(f"Uploading to S3 with metadata: {metadata}")
+        print(f"Uploading file with metadata: {metadata}")
 
         # Upload the image to S3 (without ACL since bucket is private)
         s3.put_object(
@@ -107,111 +122,6 @@ def upload_image_to_s3(image_bytes, bucket, key, content_type='image/png', is_or
         traceback.print_exc()
         raise
 
-def is_pdf_url(url):
-    """Check if the URL points to a PDF file"""
-    # Verificar se a URL termina com .pdf
-    is_pdf_extension = url.lower().endswith('.pdf')
-
-    # Verificar se a URL contém logo-uncompressed e termina com .pdf
-    # Isso garante que apenas PDFs na pasta logo-uncompressed sejam detectados
-    is_uncompressed_pdf = '/logo-uncompressed/' in url and url.lower().endswith('.pdf')
-
-    print(f"URL check: {url}, is_pdf_extension: {is_pdf_extension}, is_uncompressed_pdf: {is_uncompressed_pdf}")
-
-    return is_pdf_extension or is_uncompressed_pdf
-
-def convert_pdf_to_png(pdf_bytes):
-    """Convert PDF to PNG using a simple approach with PIL"""
-    try:
-        # Tentativa de conversão direta com PIL
-        # Nota: Isso pode não funcionar para todos os PDFs, mas é uma solução simples
-        # que não requer dependências externas
-        from PIL import Image
-        import io
-
-        # Converter PDF para imagem
-        print("Converting PDF to PNG using PIL")
-        image = Image.open(BytesIO(pdf_bytes))
-
-        # Salvar como PNG
-        output = BytesIO()
-        if image.mode == 'RGBA':
-            image.save(output, format='PNG')
-        else:
-            image.convert('RGBA').save(output, format='PNG')
-
-        output.seek(0)
-        return output.getvalue()
-    except Exception as e:
-        print(f"Error converting PDF to PNG with PIL: {str(e)}")
-
-        # Se a conversão com PIL falhar, podemos tentar usar um serviço externo
-        # ou retornar um erro mais informativo
-        raise ValueError(f"Failed to convert PDF to PNG: {str(e)}")
-
-def process_logo_url(logo_url, is_pdf):
-    """Process the logo URL, converting PDF to PNG if needed and storing in the correct folder"""
-    try:
-        print(f"Processing logo URL: {logo_url}, isPdf: {is_pdf}")
-
-        # Verificar se é um PDF (seja pelo parâmetro is_pdf ou pela função is_pdf_url)
-        is_pdf_file = is_pdf or is_pdf_url(logo_url)
-
-        # Se não for PDF, apenas retornar a URL original
-        if not is_pdf_file:
-            print("Logo is not a PDF, using as is")
-            return logo_url
-
-        print("Logo is a PDF, converting to PNG")
-
-        # Extrair informações da URL para logging
-        is_in_uncompressed = '/logo-uncompressed/' in logo_url
-        print(f"PDF is in logo-uncompressed folder: {is_in_uncompressed}")
-
-        # Baixar o PDF
-        pdf_bytes = download_image_from_url(logo_url).getvalue()
-        print(f"Downloaded PDF, size: {len(pdf_bytes)} bytes")
-
-        # Converter para PNG
-        try:
-            png_bytes = convert_pdf_to_png(pdf_bytes)
-            print(f"Converted PDF to PNG, size: {len(png_bytes)} bytes")
-        except Exception as e:
-            print(f"Error converting PDF to PNG: {str(e)}")
-            # Se a conversão falhar, retornar a URL original
-            return logo_url
-
-        # Gerar um nome único para o arquivo PNG
-        timestamp = int(time.time())
-        file_id = uuid.uuid4()
-        png_key = f"logos/{file_id}-{timestamp}.png"
-
-        # Fazer upload do PNG para a pasta logos/
-        print(f"Uploading converted PNG to S3: {S3_BUCKET}/{png_key}")
-        # Passar parâmetros adicionais para garantir que os metadados sejam definidos corretamente
-        # is_original=False porque é um arquivo convertido/processado
-        # original_filename para rastrear de qual PDF este PNG foi convertido
-        original_filename = logo_url.split('/')[-1] if '/' in logo_url else "converted-pdf.png"
-        png_url = upload_image_to_s3(
-            png_bytes,
-            S3_BUCKET,
-            png_key,
-            'image/png',
-            is_original=False,  # Não é um arquivo original
-            original_filename=original_filename  # Nome do arquivo original
-        )
-
-        print(f"Converted PNG URL: {png_url}")
-        print(f"Original PDF URL: {logo_url} -> Converted PNG URL: {png_url}")
-
-        return png_url
-    except Exception as e:
-        print(f"Error processing logo URL: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        # Em caso de erro, retornar a URL original
-        return logo_url
-
 def resize_image_with_aspect_ratio(image, max_width, max_height):
     """Resize an image maintaining aspect ratio"""
     width, height = image.size
@@ -225,14 +135,10 @@ def resize_image_with_aspect_ratio(image, max_width, max_height):
 
     return image
 
-def create_mockup(logo_url, email, name, is_pdf=False):
+def create_mockup(logo_url, email, name):
     """Create a mockup with the logo placed on the background"""
     try:
         print(f"Creating mockup for {email} with logo {logo_url}")
-
-        # Processar a URL do logo (converter PDF para PNG se necessário)
-        processed_logo_url = process_logo_url(logo_url, is_pdf)
-        print(f"Processed logo URL: {processed_logo_url}")
 
         # Download the background image from S3
         print(f"Downloading background from S3: {S3_BUCKET}/{BACKGROUND_KEY}")
@@ -241,8 +147,8 @@ def create_mockup(logo_url, email, name, is_pdf=False):
         print(f"Background size: {background.size}")
 
         # Download the logo from the provided URL
-        print(f"Downloading logo from URL: {processed_logo_url}")
-        logo_bytes = download_image_from_url(processed_logo_url)
+        print(f"Downloading logo from URL: {logo_url}")
+        logo_bytes = download_image_from_url(logo_url)
         logo = Image.open(logo_bytes).convert("RGBA")
         print(f"Original logo size: {logo.size}")
 
@@ -322,14 +228,14 @@ def create_mockup(logo_url, email, name, is_pdf=False):
 
         # Upload the mockup to S3 and get a pre-signed URL
         print(f"Uploading mockup to S3: {S3_BUCKET}/{mockup_key}")
-        # Passar parâmetros adicionais para garantir que os metadados sejam definidos corretamente
+        # Mockups são sempre arquivos originais gerados pelo sistema
         mockup_url = upload_image_to_s3(
             output.getvalue(),
             S3_BUCKET,
             mockup_key,
-            'image/png',
-            is_original=False,  # Mockup não é um arquivo original
-            original_filename=f"mockup-{email}.png"  # Nome descritivo para o mockup
+            content_type='image/png',
+            is_original=True,
+            original_filename=f"mockup-{email}-{timestamp}.png"
         )
         print(f"Mockup URL (pre-signed): {mockup_url}")
 
@@ -382,14 +288,6 @@ def lambda_handler(event, context):
         logo_url = body.get('logoUrl')
         email = body.get('email')
         name = body.get('name', 'Unknown')
-        is_pdf = body.get('isPdf', False)
-
-        # Verificar se a URL contém indicação de que é um PDF
-        # Verificamos tanto pelo parâmetro isPdf quanto pela extensão do arquivo
-        if not is_pdf and logo_url:
-            is_pdf = is_pdf_url(logo_url)
-
-        print(f"Final PDF detection: URL={logo_url}, isPdf={is_pdf}")
 
         # Validate input
         if not logo_url or not email:
@@ -406,7 +304,7 @@ def lambda_handler(event, context):
             }
 
         # Create the mockup
-        return create_mockup(logo_url, email, name, is_pdf)
+        return create_mockup(logo_url, email, name)
 
     except Exception as e:
         print(f"Error processing request: {str(e)}")

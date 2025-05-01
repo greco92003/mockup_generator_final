@@ -99,6 +99,9 @@ class PdfConverter {
               "original-filename": path.basename(
                 filename.replace(/\.pdf$/i, ".png")
               ),
+              "converted-from": filename,
+              "conversion-source": "pdf",
+              "conversion-type": "cloudconvert",
             },
           },
           export_logo: {

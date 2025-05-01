@@ -159,6 +159,9 @@ async function pdfBufferToPng(buffer, filename = "logo.pdf") {
               uncompressed: "false",
               "file-type": "png",
               "original-filename": filename.replace(/\.pdf$/i, ".png"),
+              "converted-from": filename,
+              "conversion-source": "pdf",
+              "conversion-type": "cloudconvert",
             },
           },
           export_logo: {

@@ -93,8 +93,43 @@ async function uploadToS3(
       "file-type": fileExtension,
     };
 
+    // Verificar se é um arquivo PNG convertido do CloudConvert
+    // Podemos verificar pelo nome do arquivo ou por outros indicadores
+    const isPngFromCloudConvert =
+      fileExtension === "png" &&
+      // Verificar se o nome do arquivo indica que foi convertido de PDF
+      (fileName.toLowerCase().includes("converted") ||
+        fileName.toLowerCase().includes("pdf-to-png") ||
+        // Verificar se o nome do arquivo segue o padrão de conversão (nome.pdf.png)
+        fileName.toLowerCase().match(/\.pdf\.png$/) ||
+        // Verificar se o nome do arquivo termina com -converted.png
+        fileName.toLowerCase().endsWith("-converted.png") ||
+        // Ou verificar se há metadados específicos no buffer (não é 100% confiável para arquivos binários)
+        (fileBuffer.toString().includes("converted-from") &&
+          fileBuffer.toString().includes("conversion-source") &&
+          fileBuffer.toString().includes("conversion-type")));
+
+    // Log para depuração
+    if (isPngFromCloudConvert) {
+      console.log(`Detected PNG file converted from PDF: ${fileName}`);
+      console.log(`Detection criteria matched for CloudConvert PNG file`);
+    }
+
     // Verificar se é um arquivo na pasta logo-uncompressed ou marcado como não comprimido
-    if (isUncompressed || folder === "logo-uncompressed") {
+    if (isPngFromCloudConvert) {
+      console.log(
+        `PNG file from CloudConvert detected - setting appropriate metadata`
+      );
+
+      // Adicionar metadados específicos para arquivos convertidos pelo CloudConvert
+      params.Metadata.uncompressed = "false";
+      params.Metadata["is-original"] = "false";
+      params.Metadata["converted-from"] = "pdf";
+      params.Metadata["conversion-source"] = "pdf";
+      params.Metadata["conversion-type"] = "cloudconvert";
+
+      console.log(`Setting metadata for CloudConvert converted PNG file`);
+    } else if (isUncompressed || folder === "logo-uncompressed") {
       console.log(
         `Original uncompressed file detected - setting appropriate metadata`
       );
