@@ -12,7 +12,7 @@ const cloudConvert = new CloudConvert(
   false
 ); // false = production
 
-/** Converts a PDF (buffer) to PNG and returns the local download path */
+/** Converts a PDF (buffer) to PNG with metadata and returns the local download path */
 export async function pdfBufferToPng(
   buffer: Buffer,
   filename = "logo.pdf"
@@ -28,7 +28,18 @@ export async function pdfBufferToPng(
         pages: "1", // first page only
         filename: filename.replace(/\.pdf$/i, ".png"),
       },
-      export_logo: { operation: "export/url", input: "convert_logo" },
+      // Adicionar tarefa para escrever metadados no arquivo convertido
+      add_metadata: {
+        operation: "metadata/write",
+        input: "convert_logo",
+        metadata: {
+          "is-original": "false",
+          uncompressed: "false",
+          "file-type": "png",
+          "original-filename": filename.replace(/\.pdf$/i, ".png"),
+        },
+      },
+      export_logo: { operation: "export/url", input: "add_metadata" },
     },
   });
 

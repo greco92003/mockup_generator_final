@@ -87,20 +87,34 @@ async function uploadToS3(
       // ACL removed as the bucket does not support ACLs
     };
 
-    // For PNG and PDF files, ensure no compression is applied
-    if (fileExtension === "png" || fileExtension === "pdf" || isUncompressed) {
+    // Adicionar metadados para todos os arquivos
+    params.Metadata = {
+      "original-filename": fileName,
+      "file-type": fileExtension,
+    };
+
+    // Verificar se é um arquivo na pasta logo-uncompressed ou marcado como não comprimido
+    if (isUncompressed || folder === "logo-uncompressed") {
       console.log(
-        `${
-          isUncompressed ? "Original uncompressed" : fileExtension.toUpperCase()
-        } file detected - ensuring no compression is applied`
+        `Original uncompressed file detected - setting appropriate metadata`
       );
-      // Add metadata to indicate this is an uncompressed file
-      params.Metadata = {
-        uncompressed: "true",
-        "original-filename": fileName,
-        "file-type": fileExtension,
-        "is-original": isUncompressed ? "true" : "false",
-      };
+
+      // Adicionar metadados específicos para arquivos não comprimidos
+      params.Metadata.uncompressed = "true";
+      params.Metadata["is-original"] = "true";
+
+      console.log(
+        `Setting metadata for uncompressed original file in ${folder}`
+      );
+    } else {
+      // Para arquivos na pasta logos (comprimidos/processados)
+      console.log(`Processed file detected - setting appropriate metadata`);
+
+      // Adicionar metadados específicos para arquivos comprimidos/processados
+      params.Metadata.uncompressed = "false";
+      params.Metadata["is-original"] = "false";
+
+      console.log(`Setting metadata for processed file in ${folder}`);
     }
 
     // Log the upload parameters
@@ -130,8 +144,7 @@ async function uploadToS3(
       key: result.Key,
       contentType: contentType,
       fileExtension: fileExtension,
-      isOriginalUncompressed:
-        isUncompressed || fileExtension === "png" || fileExtension === "pdf", // Flag to indicate if this is an uncompressed original
+      isOriginalUncompressed: isUncompressed || folder === "logo-uncompressed", // Flag to indicate if this is an uncompressed original
       originalFileName: fileName,
       folder: folder,
     };

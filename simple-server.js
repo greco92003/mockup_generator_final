@@ -1,18 +1,21 @@
-const express = require('express');
-const cors = require('cors');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-const dotenv = require('dotenv');
-const CloudConvert = require('cloudconvert');
-const https = require('https');
-const { createCanvas, loadImage } = require('canvas');
+const express = require("express");
+const cors = require("cors");
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
+const dotenv = require("dotenv");
+const CloudConvert = require("cloudconvert");
+const https = require("https");
+const { createCanvas, loadImage } = require("canvas");
 
 // Load environment variables
 dotenv.config();
 
 // Initialize CloudConvert
-const cloudConvert = new CloudConvert(process.env.CLOUDCONVERT_API_KEY || '', false); // false = production
+const cloudConvert = new CloudConvert(
+  process.env.CLOUDCONVERT_API_KEY || "",
+  false
+); // false = production
 
 // Initialize Express
 const app = express();
@@ -23,123 +26,139 @@ app.use(express.json());
 const upload = multer({ storage: multer.memoryStorage() });
 
 // Create temp directory if it doesn't exist
-const tempDir = path.join(__dirname, 'temp');
+const tempDir = path.join(__dirname, "temp");
 if (!fs.existsSync(tempDir)) {
   fs.mkdirSync(tempDir, { recursive: true });
 }
 
-// Convert PDF to PNG using CloudConvert
-async function pdfBufferToPng(buffer, filename = 'logo.pdf') {
+// Convert PDF to PNG using CloudConvert with metadata
+async function pdfBufferToPng(buffer, filename = "logo.pdf") {
   try {
-    console.log('Starting PDF to PNG conversion with CloudConvert...');
-    
+    console.log("Starting PDF to PNG conversion with CloudConvert...");
+
     // Create job (upload + convert + export)
     const job = await cloudConvert.jobs.create({
       tasks: {
-        upload_logo: { operation: 'import/upload' },
+        upload_logo: { operation: "import/upload" },
         convert_logo: {
-          operation: 'convert',
-          input: 'upload_logo',
-          output_format: 'png',
-          pages: '1',                // first page only
-          filename: filename.replace(/\.pdf$/i, '.png')
+          operation: "convert",
+          input: "upload_logo",
+          output_format: "png",
+          pages: "1", // first page only
+          filename: filename.replace(/\.pdf$/i, ".png"),
         },
-        export_logo: { operation: 'export/url', input: 'convert_logo' }
-      }
+        // Adicionar tarefa para escrever metadados no arquivo convertido
+        add_metadata: {
+          operation: "metadata/write",
+          input: "convert_logo",
+          metadata: {
+            "is-original": "false",
+            uncompressed: "false",
+            "file-type": "png",
+            "original-filename": filename.replace(/\.pdf$/i, ".png"),
+          },
+        },
+        export_logo: { operation: "export/url", input: "add_metadata" },
+      },
     });
 
-    console.log('Job created:', job.id);
+    console.log("Job created:", job.id);
 
     // Upload the file
-    const uploadTask = job.tasks.find(t => t.name === 'upload_logo');
-    await cloudConvert.tasks.upload(uploadTask, buffer, filename, buffer.length);
-    console.log('File uploaded to CloudConvert');
+    const uploadTask = job.tasks.find((t) => t.name === "upload_logo");
+    await cloudConvert.tasks.upload(
+      uploadTask,
+      buffer,
+      filename,
+      buffer.length
+    );
+    console.log("File uploaded to CloudConvert");
 
     // Wait for completion
-    console.log('Waiting for conversion to complete...');
+    console.log("Waiting for conversion to complete...");
     const completed = await cloudConvert.jobs.wait(job.id);
-    console.log('Conversion completed');
+    console.log("Conversion completed");
 
     // Download the generated PNG
     const file = cloudConvert.jobs.getExportUrls(completed)[0];
-    console.log('Download URL:', file.url);
-    
+    console.log("Download URL:", file.url);
+
     const localPath = path.join(tempDir, file.filename);
-    
+
     await new Promise((resolve, reject) => {
       const ws = fs.createWriteStream(localPath);
-      https.get(file.url, response => response.pipe(ws));
-      ws.on('finish', () => {
-        console.log('File downloaded to:', localPath);
+      https.get(file.url, (response) => response.pipe(ws));
+      ws.on("finish", () => {
+        console.log("File downloaded to:", localPath);
         resolve();
       });
-      ws.on('error', reject);
+      ws.on("error", reject);
     });
 
     return localPath;
   } catch (error) {
-    console.error('Error converting PDF to PNG:', error);
+    console.error("Error converting PDF to PNG:", error);
     throw error;
   }
 }
 
 // API endpoint for PDF to PNG conversion
-app.post('/api/convert', upload.single('file'), async (req, res) => {
+app.post("/api/convert", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ error: 'File is required' });
+      return res.status(400).json({ error: "File is required" });
     }
 
     const mime = req.file.mimetype;
     let filePath;
 
-    if (mime === 'application/pdf') {
+    if (mime === "application/pdf") {
       // Convert PDF to PNG using CloudConvert
-      console.log('Converting PDF to PNG...');
+      console.log("Converting PDF to PNG...");
       filePath = await pdfBufferToPng(req.file.buffer, req.file.originalname);
-      
+
       // Read the converted file
       const fileBuffer = fs.readFileSync(filePath);
-      
+
       // Convert to base64 for response
-      const b64 = fileBuffer.toString('base64');
-      
+      const b64 = fileBuffer.toString("base64");
+
       // Return the result
       res.json({
         success: true,
-        message: 'PDF converted to PNG successfully',
-        image: `data:image/png;base64,${b64}`
+        message: "PDF converted to PNG successfully",
+        image: `data:image/png;base64,${b64}`,
       });
-      
+
       // Clean up temporary files
       setTimeout(() => {
         try {
           if (fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
-            console.log('Temporary file deleted:', filePath);
+            console.log("Temporary file deleted:", filePath);
           }
         } catch (error) {
-          console.error('Error cleaning up temporary files:', error);
+          console.error("Error cleaning up temporary files:", error);
         }
       }, 5000);
     } else {
       return res.status(400).json({
-        error: 'Unsupported file format. Please upload a PDF file.'
+        error: "Unsupported file format. Please upload a PDF file.",
       });
     }
   } catch (error) {
-    console.error('Error processing request:', error);
-    res.status(500).json({ error: 'Failed to convert PDF to PNG' });
+    console.error("Error processing request:", error);
+    res.status(500).json({ error: "Failed to convert PDF to PNG" });
   }
 });
 
 // Health check route
-app.get('/', (req, res) => {
-  res.json({ 
-    status: 'API is running',
+app.get("/", (req, res) => {
+  res.json({
+    status: "API is running",
     endpoints: {
-      convert: '/api/convert - POST - Convert PDF to PNG'
-    }
+      convert: "/api/convert - POST - Convert PDF to PNG",
+    },
   });
 });
 

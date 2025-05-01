@@ -22,6 +22,7 @@ Quando um usuário envia um arquivo PDF:
 5. O Lambda usa o PNG convertido para gerar o mockup
 
 Resultado:
+
 - O PDF original fica armazenado em `logo-uncompressed/`
 - O PNG convertido fica armazenado em `logos/`
 - O mockup é gerado usando o PNG convertido
@@ -36,6 +37,7 @@ Quando um usuário envia um arquivo PNG ou JPG:
 4. O Lambda usa diretamente o arquivo da pasta `logos/` para gerar o mockup
 
 Resultado:
+
 - O arquivo original fica armazenado em `logo-uncompressed/`
 - Uma cópia do arquivo fica armazenada em `logos/`
 - O mockup é gerado usando a cópia da pasta `logos/`
@@ -45,6 +47,7 @@ Resultado:
 O sistema detecta o tipo de arquivo de várias maneiras:
 
 1. **No servidor Node.js**:
+
    - Através do MIME type do arquivo enviado (`req.file.mimetype`)
    - Através da extensão do arquivo original (`req.file.originalname`)
 
@@ -60,7 +63,29 @@ Todos os arquivos enviados para o S3 incluem metadados que indicam:
 - Se é um arquivo original não comprimido (`is-original: true/false`)
 - O nome do arquivo original (`original-filename`)
 - O tipo de arquivo (`file-type`)
-- Se deve ser tratado como não comprimido (`uncompressed: true`)
+- Se deve ser tratado como não comprimido (`uncompressed: true/false`)
+
+### Valores de Metadados por Tipo de Arquivo
+
+1. **Arquivos na pasta `logo-uncompressed/`**:
+
+   - `is-original: true`
+   - `uncompressed: true`
+   - `file-type`: extensão do arquivo (pdf, png, jpg)
+   - `original-filename`: nome original do arquivo enviado pelo usuário
+
+2. **Arquivos na pasta `logos/`**:
+
+   - `is-original: false`
+   - `uncompressed: false`
+   - `file-type`: extensão do arquivo (png, jpg)
+   - `original-filename`: nome original do arquivo enviado pelo usuário
+
+3. **PNGs convertidos de PDFs na pasta `logos/`**:
+   - `is-original: false`
+   - `uncompressed: false`
+   - `file-type: png`
+   - `original-filename`: nome do arquivo PDF original
 
 ## Fluxo de Dados para ActiveCampaign
 

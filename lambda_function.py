@@ -59,15 +59,37 @@ def download_image_from_s3(bucket, key):
         traceback.print_exc()
         raise
 
-def upload_image_to_s3(image_bytes, bucket, key, content_type='image/png'):
+def upload_image_to_s3(image_bytes, bucket, key, content_type='image/png', is_original=False, original_filename=None):
     """Upload an image to S3 and generate a pre-signed URL"""
     try:
+        # Preparar metadados para o arquivo
+        metadata = {
+            "file-type": key.split('.')[-1].lower(),
+            "is-original": str(is_original).lower(),
+            "uncompressed": str(is_original).lower(),
+        }
+
+        # Adicionar nome do arquivo original se fornecido
+        if original_filename:
+            metadata["original-filename"] = original_filename
+
+        # Determinar se o arquivo está na pasta logo-uncompressed
+        is_in_uncompressed = 'logo-uncompressed/' in key
+
+        # Ajustar metadados com base na pasta
+        if is_in_uncompressed:
+            metadata["is-original"] = "true"
+            metadata["uncompressed"] = "true"
+
+        print(f"Uploading to S3 with metadata: {metadata}")
+
         # Upload the image to S3 (without ACL since bucket is private)
         s3.put_object(
             Body=image_bytes,
             Bucket=bucket,
             Key=key,
-            ContentType=content_type
+            ContentType=content_type,
+            Metadata=metadata
         )
 
         # Generate a pre-signed URL that expires in 7 days
@@ -166,7 +188,18 @@ def process_logo_url(logo_url, is_pdf):
 
         # Fazer upload do PNG para a pasta logos/
         print(f"Uploading converted PNG to S3: {S3_BUCKET}/{png_key}")
-        png_url = upload_image_to_s3(png_bytes, S3_BUCKET, png_key, 'image/png')
+        # Passar parâmetros adicionais para garantir que os metadados sejam definidos corretamente
+        # is_original=False porque é um arquivo convertido/processado
+        # original_filename para rastrear de qual PDF este PNG foi convertido
+        original_filename = logo_url.split('/')[-1] if '/' in logo_url else "converted-pdf.png"
+        png_url = upload_image_to_s3(
+            png_bytes,
+            S3_BUCKET,
+            png_key,
+            'image/png',
+            is_original=False,  # Não é um arquivo original
+            original_filename=original_filename  # Nome do arquivo original
+        )
 
         print(f"Converted PNG URL: {png_url}")
         print(f"Original PDF URL: {logo_url} -> Converted PNG URL: {png_url}")
@@ -289,7 +322,15 @@ def create_mockup(logo_url, email, name, is_pdf=False):
 
         # Upload the mockup to S3 and get a pre-signed URL
         print(f"Uploading mockup to S3: {S3_BUCKET}/{mockup_key}")
-        mockup_url = upload_image_to_s3(output.getvalue(), S3_BUCKET, mockup_key)
+        # Passar parâmetros adicionais para garantir que os metadados sejam definidos corretamente
+        mockup_url = upload_image_to_s3(
+            output.getvalue(),
+            S3_BUCKET,
+            mockup_key,
+            'image/png',
+            is_original=False,  # Mockup não é um arquivo original
+            original_filename=f"mockup-{email}.png"  # Nome descritivo para o mockup
+        )
         print(f"Mockup URL (pre-signed): {mockup_url}")
 
         return {

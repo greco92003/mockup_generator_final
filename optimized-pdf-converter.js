@@ -83,14 +83,27 @@ class PdfConverter {
             pixel_density: 72,
             width: 326, // Apenas definir a largura, altura será calculada automaticamente
             alpha: true, // Transparent background
-            strip: true, // Strip metadata for smaller files
+            strip: false, // Não remover metadados para que possamos adicionar os nossos
             trim: false, // Don't trim as it might affect positioning
             quality: 90, // Slightly reduced quality for faster conversion
             filename: path.basename(filename.replace(/\.pdf$/i, ".png")),
           },
+          // Adicionar tarefa para escrever metadados no arquivo convertido
+          add_metadata: {
+            operation: "metadata/write",
+            input: "convert_logo",
+            metadata: {
+              "is-original": "false",
+              uncompressed: "false",
+              "file-type": "png",
+              "original-filename": path.basename(
+                filename.replace(/\.pdf$/i, ".png")
+              ),
+            },
+          },
           export_logo: {
             operation: "export/url",
-            input: "convert_logo",
+            input: "add_metadata",
           },
         },
       });

@@ -124,7 +124,7 @@ if (!fs.existsSync(defaultBgPath)) {
 // Set up multer for file uploads
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Convert PDF to PNG using CloudConvert with transparent background
+// Convert PDF to PNG using CloudConvert with transparent background and add metadata
 async function pdfBufferToPng(buffer, filename = "logo.pdf") {
   try {
     console.log("Starting PDF to PNG conversion with CloudConvert...");
@@ -150,9 +150,20 @@ async function pdfBufferToPng(buffer, filename = "logo.pdf") {
             alpha: true, // Alpha: Yes - Render pages with an alpha channel and transparent background
             filename: filename.replace(/\.pdf$/i, ".png"),
           },
+          // Adicionar tarefa para escrever metadados no arquivo convertido
+          add_metadata: {
+            operation: "metadata/write",
+            input: "convert_logo",
+            metadata: {
+              "is-original": "false",
+              uncompressed: "false",
+              "file-type": "png",
+              "original-filename": filename.replace(/\.pdf$/i, ".png"),
+            },
+          },
           export_logo: {
             operation: "export/url",
-            input: "convert_logo",
+            input: "add_metadata", // Alterar para usar o resultado da tarefa de metadados
           },
         },
       });
