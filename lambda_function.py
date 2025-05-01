@@ -60,6 +60,8 @@ def upload_image_to_s3(image_bytes, bucket, key, content_type='image/png', is_or
     """Upload an image to S3 and generate a pre-signed URL"""
     try:
         # Preparar metadados para o arquivo
+        # Nota: boto3 adiciona automaticamente o prefixo x-amz-meta- aos metadados
+        # Importante usar nomes de chave em minúsculas e valores compatíveis com ASCII
         metadata = {
             "file-type": key.split('.')[-1].lower(),
             "is-original": str(is_original).lower(),
@@ -70,31 +72,50 @@ def upload_image_to_s3(image_bytes, bucket, key, content_type='image/png', is_or
         if original_filename:
             metadata["original-filename"] = original_filename
 
-        # Verificar se o arquivo é um PNG convertido do PDF
-        is_converted_png = False
-        if key.endswith('.png'):
-            # Verificar se o nome do arquivo indica que foi convertido de PDF
-            if original_filename and (
-                original_filename.lower().endswith('-converted.png') or
-                '.pdf.png' in original_filename.lower() or
-                'pdf-to-png' in original_filename.lower() or
-                'converted-from' in str(metadata)
-            ):
-                is_converted_png = True
-                metadata["is-original"] = "false"
-                metadata["uncompressed"] = "false"
-                metadata["converted-from"] = "pdf"
-                metadata["conversion-source"] = "pdf"
-                metadata["conversion-type"] = "cloudconvert"
-                print(f"Detected PNG file converted from PDF: {original_filename}")
+        try:
+            # Verificar se o arquivo é um PNG convertido do PDF
+            is_converted_png = False
+            if key.endswith('.png'):
+                # Verificar se o nome do arquivo indica que foi convertido de PDF
+                if original_filename and (
+                    original_filename.lower().endswith('-converted.png') or
+                    '.pdf.png' in original_filename.lower() or
+                    'pdf-to-png' in original_filename.lower() or
+                    'converted-from' in str(metadata)
+                ):
+                    is_converted_png = True
+                    metadata["is-original"] = "false"
+                    metadata["uncompressed"] = "false"
+                    metadata["converted-from"] = "pdf"
+                    metadata["conversion-source"] = "pdf"
+                    metadata["conversion-type"] = "cloudconvert"
+                    print(f"Detected PNG file converted from PDF: {original_filename}")
 
-        # Determinar se o arquivo está na pasta logo-uncompressed
-        is_in_uncompressed = 'logo-uncompressed/' in key
+            # Determinar se o arquivo está na pasta logo-uncompressed
+            is_in_uncompressed = 'logo-uncompressed/' in key
 
-        # Ajustar metadados com base na pasta
-        if is_in_uncompressed:
-            metadata["is-original"] = "true"
-            metadata["uncompressed"] = "true"
+            # Ajustar metadados com base na pasta
+            if is_in_uncompressed:
+                metadata["is-original"] = "true"
+                metadata["uncompressed"] = "true"
+
+            # Verificar se o tamanho total dos metadados não excede 2KB
+            metadata_size = sum(len(key) + len(str(value)) for key, value in metadata.items())
+            if metadata_size > 2048:
+                print(f"Warning: Metadata size ({metadata_size} bytes) exceeds 2KB limit. Some metadata may be truncated.")
+                # Remover metadados menos importantes se necessário
+                if "conversion-source" in metadata:
+                    del metadata["conversion-source"]
+                if "conversion-type" in metadata:
+                    del metadata["conversion-type"]
+        except Exception as metadata_error:
+            print(f"Error setting metadata: {str(metadata_error)}")
+            # Continuar com o upload mesmo se houver erro nos metadados
+            # Definir metadados mínimos
+            metadata = {
+                "file-type": key.split('.')[-1].lower(),
+                "is-original": str(is_original).lower(),
+            }
 
         print(f"Uploading file with metadata: {metadata}")
 

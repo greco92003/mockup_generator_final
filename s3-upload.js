@@ -87,7 +87,9 @@ async function uploadToS3(
       // ACL removed as the bucket does not support ACLs
     };
 
-    // Adicionar metadados para todos os arquivos
+    // Adicionar metadados para todos os arquivos - usando o prefixo x-amz-meta- para garantir compatibilidade
+    // Nota: O AWS SDK para Node.js adiciona automaticamente o prefixo x-amz-meta- aos metadados
+    // mas é importante usar nomes de chave em minúsculas e valores compatíveis com ASCII
     params.Metadata = {
       "original-filename": fileName,
       "file-type": fileExtension,
@@ -116,40 +118,66 @@ async function uploadToS3(
     }
 
     // Verificar se é um arquivo na pasta logo-uncompressed ou marcado como não comprimido
-    if (isPngFromCloudConvert) {
-      console.log(
-        `PNG file from CloudConvert detected - setting appropriate metadata`
+    try {
+      if (isPngFromCloudConvert) {
+        console.log(
+          `PNG file from CloudConvert detected - setting appropriate metadata`
+        );
+
+        // Adicionar metadados específicos para arquivos convertidos pelo CloudConvert
+        // Usando nomes de chave em minúsculas para garantir compatibilidade
+        params.Metadata.uncompressed = "false";
+        params.Metadata["is-original"] = "false";
+        params.Metadata["converted-from"] = "pdf";
+        params.Metadata["conversion-source"] = "pdf";
+        params.Metadata["conversion-type"] = "cloudconvert";
+
+        console.log(`Setting metadata for CloudConvert converted PNG file`);
+      } else if (isUncompressed || folder === "logo-uncompressed") {
+        console.log(
+          `Original uncompressed file detected - setting appropriate metadata`
+        );
+
+        // Adicionar metadados específicos para arquivos não comprimidos
+        params.Metadata.uncompressed = "true";
+        params.Metadata["is-original"] = "true";
+
+        console.log(
+          `Setting metadata for uncompressed original file in ${folder}`
+        );
+      } else {
+        // Para arquivos na pasta logos (comprimidos/processados)
+        console.log(`Processed file detected - setting appropriate metadata`);
+
+        // Adicionar metadados específicos para arquivos comprimidos/processados
+        params.Metadata.uncompressed = "false";
+        params.Metadata["is-original"] = "false";
+
+        console.log(`Setting metadata for processed file in ${folder}`);
+      }
+
+      // Verificar se o tamanho total dos metadados não excede 2KB
+      const metadataSize = Object.entries(params.Metadata).reduce(
+        (size, [key, value]) => size + key.length + (value ? value.length : 0),
+        0
       );
 
-      // Adicionar metadados específicos para arquivos convertidos pelo CloudConvert
-      params.Metadata.uncompressed = "false";
-      params.Metadata["is-original"] = "false";
-      params.Metadata["converted-from"] = "pdf";
-      params.Metadata["conversion-source"] = "pdf";
-      params.Metadata["conversion-type"] = "cloudconvert";
-
-      console.log(`Setting metadata for CloudConvert converted PNG file`);
-    } else if (isUncompressed || folder === "logo-uncompressed") {
-      console.log(
-        `Original uncompressed file detected - setting appropriate metadata`
-      );
-
-      // Adicionar metadados específicos para arquivos não comprimidos
-      params.Metadata.uncompressed = "true";
-      params.Metadata["is-original"] = "true";
-
-      console.log(
-        `Setting metadata for uncompressed original file in ${folder}`
-      );
-    } else {
-      // Para arquivos na pasta logos (comprimidos/processados)
-      console.log(`Processed file detected - setting appropriate metadata`);
-
-      // Adicionar metadados específicos para arquivos comprimidos/processados
-      params.Metadata.uncompressed = "false";
-      params.Metadata["is-original"] = "false";
-
-      console.log(`Setting metadata for processed file in ${folder}`);
+      if (metadataSize > 2048) {
+        console.warn(
+          `Metadata size (${metadataSize} bytes) exceeds 2KB limit. Some metadata may be truncated.`
+        );
+        // Remover metadados menos importantes se necessário
+        delete params.Metadata["conversion-source"];
+        delete params.Metadata["conversion-type"];
+      }
+    } catch (metadataError) {
+      console.error("Error setting metadata:", metadataError);
+      // Continuar com o upload mesmo se houver erro nos metadados
+      // Definir metadados mínimos
+      params.Metadata = {
+        "original-filename": fileName,
+        "file-type": fileExtension,
+      };
     }
 
     // Log the upload parameters
