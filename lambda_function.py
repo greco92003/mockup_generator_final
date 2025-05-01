@@ -56,7 +56,7 @@ def download_image_from_s3(bucket, key):
         traceback.print_exc()
         raise
 
-def upload_image_to_s3(image_bytes, bucket, key, content_type='image/png', is_original=False, original_filename=None):
+def upload_image_to_s3(image_bytes, bucket, key, content_type='image/png', is_original=False, original_filename=None, is_pdf=False):
     """Upload an image to S3 and generate a pre-signed URL"""
     try:
         # Preparar metadados para o arquivo
@@ -75,7 +75,12 @@ def upload_image_to_s3(image_bytes, bucket, key, content_type='image/png', is_or
         try:
             # Verificar se o arquivo é um PNG convertido do PDF
             is_converted_png = False
-            if key.endswith('.png'):
+
+            # Use the is_pdf flag from the request if available
+            if is_pdf:
+                is_converted_png = True
+                print(f"Using isPdf flag from request to mark as converted PNG")
+            elif key.endswith('.png'):
                 # Verificar se o nome do arquivo indica que foi convertido de PDF
                 if original_filename and (
                     original_filename.lower().endswith('-converted.png') or
@@ -84,12 +89,15 @@ def upload_image_to_s3(image_bytes, bucket, key, content_type='image/png', is_or
                     'converted-from' in str(metadata)
                 ):
                     is_converted_png = True
-                    metadata["is-original"] = "false"
-                    metadata["uncompressed"] = "false"
-                    metadata["converted-from"] = "pdf"
-                    metadata["conversion-source"] = "pdf"
-                    metadata["conversion-type"] = "cloudconvert"
-                    print(f"Detected PNG file converted from PDF: {original_filename}")
+                    print(f"Detected PNG file converted from PDF based on filename: {original_filename}")
+
+            if is_converted_png:
+                metadata["is-original"] = "false"
+                metadata["uncompressed"] = "false"
+                metadata["converted-from"] = "pdf"
+                metadata["conversion-source"] = "pdf"
+                metadata["conversion-type"] = "cloudconvert"
+                print(f"Setting metadata for PNG file converted from PDF")
 
             # Determinar se o arquivo está na pasta logo-uncompressed
             is_in_uncompressed = 'logo-uncompressed/' in key
@@ -156,10 +164,11 @@ def resize_image_with_aspect_ratio(image, max_width, max_height):
 
     return image
 
-def create_mockup(logo_url, email, name):
+def create_mockup(logo_url, email, name, is_pdf=False):
     """Create a mockup with the logo placed on the background"""
     try:
         print(f"Creating mockup for {email} with logo {logo_url}")
+        print(f"Is PDF flag: {is_pdf}")
 
         # Download the background image from S3
         print(f"Downloading background from S3: {S3_BUCKET}/{BACKGROUND_KEY}")
@@ -256,7 +265,8 @@ def create_mockup(logo_url, email, name):
             mockup_key,
             content_type='image/png',
             is_original=True,
-            original_filename=f"mockup-{email}-{timestamp}.png"
+            original_filename=f"mockup-{email}-{timestamp}.png",
+            is_pdf=is_pdf  # Pass the is_pdf flag to the upload function
         )
         print(f"Mockup URL (pre-signed): {mockup_url}")
 
@@ -309,6 +319,9 @@ def lambda_handler(event, context):
         logo_url = body.get('logoUrl')
         email = body.get('email')
         name = body.get('name', 'Unknown')
+        is_pdf = body.get('isPdf', False)  # Get the isPdf flag, default to False if not provided
+
+        print(f"isPdf flag from request: {is_pdf}")
 
         # Validate input
         if not logo_url or not email:
@@ -325,7 +338,7 @@ def lambda_handler(event, context):
             }
 
         # Create the mockup
-        return create_mockup(logo_url, email, name)
+        return create_mockup(logo_url, email, name, is_pdf)
 
     except Exception as e:
         print(f"Error processing request: {str(e)}")

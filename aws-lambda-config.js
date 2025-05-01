@@ -37,7 +37,11 @@ async function generateMockupWithLambda(logoUrl, email, name, fileType = "") {
       fileType === "pdf" ||
       logoUrl.toLowerCase().endsWith(".pdf") ||
       (logoUrl.toLowerCase().includes("/logo-uncompressed/") &&
-        logoUrl.toLowerCase().endsWith(".pdf"));
+        logoUrl.toLowerCase().endsWith(".pdf")) ||
+      // Also check if it's a PNG that was converted from PDF
+      (fileType === "png" &&
+        (logoUrl.toLowerCase().includes("converted") ||
+          logoUrl.toLowerCase().includes("pdf-to-png")));
 
     console.log("Is PDF file that needs conversion:", isPdf);
     console.log("Detection details - fileType:", fileType);
@@ -46,6 +50,12 @@ async function generateMockupWithLambda(logoUrl, email, name, fileType = "") {
       "URL contains logo-uncompressed and ends with .pdf:",
       logoUrl.toLowerCase().includes("/logo-uncompressed/") &&
         logoUrl.toLowerCase().endsWith(".pdf")
+    );
+    console.log(
+      "Is PNG converted from PDF:",
+      fileType === "png" &&
+        (logoUrl.toLowerCase().includes("converted") ||
+          logoUrl.toLowerCase().includes("pdf-to-png"))
     );
 
     // Prepare headers with API key if available
