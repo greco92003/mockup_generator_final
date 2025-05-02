@@ -1,6 +1,6 @@
 /**
  * Unified AWS Lambda Config Module
- * 
+ *
  * This module provides functions for interacting with AWS Lambda.
  */
 
@@ -36,8 +36,8 @@ async function generateMockupWithLambda(logoUrl, email, name, fileType = "") {
     console.log("File Type:", fileType);
 
     // Determine if the file is a PDF based on the file extension or fileType parameter
-    const isPdf = 
-      (logoUrl && logoUrl.toLowerCase().endsWith(".pdf")) || 
+    const isPdf =
+      (logoUrl && logoUrl.toLowerCase().endsWith(".pdf")) ||
       (fileType && fileType.toLowerCase() === "pdf");
 
     console.log("Is PDF:", isPdf);
@@ -85,7 +85,10 @@ async function generateMockupWithLambda(logoUrl, email, name, fileType = "") {
     );
 
     console.log("Lambda response status:", response.status);
-    console.log("Lambda response data:", JSON.stringify(response.data).substring(0, 200) + "...");
+    console.log(
+      "Lambda response data:",
+      JSON.stringify(response.data).substring(0, 200) + "..."
+    );
 
     // Check for Lambda execution errors
     if (response.data.errorType) {
@@ -120,12 +123,27 @@ async function generateMockupWithLambda(logoUrl, email, name, fileType = "") {
     if (!mockupUrl) {
       console.warn("No mockup URL found in Lambda response");
       console.log("Response data:", response.data);
-      
+
       // Generate a fallback mockup URL
       const fallbackUrl = generateFallbackMockupUrl(email);
       console.log("Generated fallback mockup URL:", fallbackUrl);
-      
+
       return fallbackUrl;
+    }
+
+    // Ensure the URL includes the region
+    if (
+      mockupUrl.includes("s3.amazonaws.com") &&
+      !mockupUrl.includes("s3.us-east-1.amazonaws.com")
+    ) {
+      console.log("Fixing S3 URL to include region...");
+      const fixedUrl = mockupUrl.replace(
+        "s3.amazonaws.com",
+        "s3.us-east-1.amazonaws.com"
+      );
+      console.log("Original URL:", mockupUrl);
+      console.log("Fixed URL:", fixedUrl);
+      return fixedUrl;
     }
 
     console.log("Mockup generated successfully with Lambda:", mockupUrl);
@@ -171,10 +189,10 @@ function generateFallbackMockupUrl(email) {
   // This should be a URL to a generic mockup image that definitely exists
 
   // Use a fixed URL to a default mockup that we know exists
-  // This is a placeholder - replace with an actual URL to a default mockup image
+  // Make sure to include the region in the URL to match the format of generated mockups
   const fallbackUrl =
     process.env.DEFAULT_MOCKUP_URL ||
-    "https://mockup-hudlab.s3.amazonaws.com/mockups/default-mockup.png";
+    "https://mockup-hudlab.s3.us-east-1.amazonaws.com/mockups/default-mockup.png";
 
   console.log(`Using static fallback mockup URL for ${email}: ${fallbackUrl}`);
 

@@ -71,6 +71,7 @@ async function pdfBufferToPng(buffer, filename, options = {}) {
         engine: "mupdf", // Use MuPDF engine instead of GraphicsMagick
         pixel_density: pixelDensity,
         alpha: alpha,
+        pages: "1", // Explicitly convert only the first page
         filename: filename.replace(/\.pdf$/i, ".png"),
       },
     };

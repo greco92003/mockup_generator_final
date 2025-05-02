@@ -40,11 +40,41 @@ function updateMockupUrlAsync(email, mockupUrl) {
     return;
   }
 
+  // Convert mockupUrl to direct URL if it's a pre-signed URL
+  let finalMockupUrl = mockupUrl;
+  if (mockupUrl.includes("?")) {
+    finalMockupUrl = mockupUrl.split("?")[0];
+    console.log(
+      "Converting pre-signed URL to direct URL for mockup_url field:"
+    );
+    console.log("Original URL:", mockupUrl);
+    console.log("Direct URL:", finalMockupUrl);
+  }
+
+  // Ensure the URL includes the region
+  if (
+    finalMockupUrl.includes("s3.amazonaws.com") &&
+    !finalMockupUrl.includes("s3.us-east-1.amazonaws.com")
+  ) {
+    console.log("Fixing S3 URL to include region...");
+    finalMockupUrl = finalMockupUrl.replace(
+      "s3.amazonaws.com",
+      "s3.us-east-1.amazonaws.com"
+    );
+    console.log("Fixed URL with region:", finalMockupUrl);
+  }
+
   // Use setTimeout to make this non-blocking
   setTimeout(async () => {
     try {
       console.log(`Starting async update of mockup URL for ${email}`);
-      const result = await activeCampaign.updateLeadMockupUrl(email, mockupUrl);
+      console.log(
+        `Final mockup URL being sent to ActiveCampaign: ${finalMockupUrl}`
+      );
+      const result = await activeCampaign.updateLeadMockupUrl(
+        email,
+        finalMockupUrl
+      );
       console.log(`Mockup URL updated successfully (async): ${email}`);
       console.log(`Update result:`, JSON.stringify(result));
     } catch (error) {
