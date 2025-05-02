@@ -203,7 +203,8 @@ def create_mockup(logo_url, email, name):
             },
             'body': json.dumps({
                 'message': 'Mockup created successfully',
-                'mockupUrl': direct_url,  # Use direct URL instead of pre-signed URL
+                'mockupUrl': direct_url,  # Use direct URL as the primary URL
+                'directUrl': direct_url,  # Also include as directUrl for clarity
                 'presignedUrl': mockup_url,  # Include pre-signed URL for reference
                 'email': email,
                 'name': name,

@@ -99,15 +99,10 @@ async function generateMockupWithLambda(logoUrl, email, name, fileType = "") {
         response.data.errorMessage &&
         response.data.errorMessage.includes("signal: killed")
       ) {
-        console.warn(
-          "Lambda was killed due to resource constraints. Using fallback mechanism..."
+        console.error(
+          "Lambda was killed due to resource constraints. No mockup URL will be generated."
         );
-
-        // Generate a fallback mockup URL
-        const fallbackUrl = generateFallbackMockupUrl(email);
-        console.log("Generated fallback mockup URL:", fallbackUrl);
-
-        return fallbackUrl;
+        return null;
       }
 
       throw new Error(
@@ -118,7 +113,16 @@ async function generateMockupWithLambda(logoUrl, email, name, fileType = "") {
     }
 
     // Extract mockup URL from response
-    let mockupUrl = response.data.mockupUrl || response.data.url;
+    let mockupUrl = null;
+
+    // First, try to get the direct URL from the response
+    if (response.data.mockupUrl) {
+      console.log("Found mockupUrl in response:", response.data.mockupUrl);
+      mockupUrl = response.data.mockupUrl;
+    } else if (response.data.url) {
+      console.log("Found url in response:", response.data.url);
+      mockupUrl = response.data.url;
+    }
 
     // Check if the response contains a body field (API Gateway format)
     if (!mockupUrl && response.data.body) {
@@ -136,21 +140,35 @@ async function generateMockupWithLambda(logoUrl, email, name, fileType = "") {
             bodyContent.mockupUrl
           );
           mockupUrl = bodyContent.mockupUrl;
+        } else if (bodyContent.directUrl) {
+          console.log(
+            "Found directUrl in response body:",
+            bodyContent.directUrl
+          );
+          mockupUrl = bodyContent.directUrl;
+        } else if (bodyContent.url) {
+          console.log("Found url in response body:", bodyContent.url);
+          mockupUrl = bodyContent.url;
         }
       } catch (parseError) {
         console.error("Error parsing Lambda response body:", parseError);
+        console.error("Response body:", response.data.body);
       }
     }
 
+    // Log the full response for debugging
+    console.log(
+      "Full Lambda response:",
+      JSON.stringify(response.data, null, 2)
+    );
+
     if (!mockupUrl) {
-      console.warn("No mockup URL found in Lambda response");
-      console.log("Response data:", response.data);
+      console.error("No mockup URL found in Lambda response");
+      console.error("Response data:", JSON.stringify(response.data, null, 2));
 
-      // Generate a fallback mockup URL
-      const fallbackUrl = generateFallbackMockupUrl(email);
-      console.log("Generated fallback mockup URL:", fallbackUrl);
-
-      return fallbackUrl;
+      // In this case, we don't want to generate a fallback URL anymore
+      // We'll return null and let the caller handle it
+      return null;
     }
 
     // Convert pre-signed URL to direct URL if needed
@@ -168,13 +186,40 @@ async function generateMockupWithLambda(logoUrl, email, name, fileType = "") {
       !mockupUrl.includes("s3.us-east-1.amazonaws.com")
     ) {
       console.log("Fixing S3 URL to include region...");
-      const fixedUrl = mockupUrl.replace(
+      mockupUrl = mockupUrl.replace(
         "s3.amazonaws.com",
         "s3.us-east-1.amazonaws.com"
       );
-      console.log("Original URL:", mockupUrl);
-      console.log("Fixed URL:", fixedUrl);
-      return fixedUrl;
+      console.log("Fixed URL with region:", mockupUrl);
+    }
+
+    // Verify that the URL is a direct S3 bucket URL
+    if (
+      !mockupUrl.includes("mockup-hudlab.s3") ||
+      !mockupUrl.includes("/mockups/")
+    ) {
+      console.warn(
+        "WARNING: Mockup URL does not appear to be a direct S3 bucket URL:",
+        mockupUrl
+      );
+
+      // Try to extract the key part if it's in a different format
+      if (
+        mockupUrl.includes("mockup-hudlab") &&
+        mockupUrl.includes("amazonaws.com")
+      ) {
+        const urlParts = mockupUrl.split("/");
+        const bucketIndex = urlParts.findIndex((part) =>
+          part.includes("mockup-hudlab")
+        );
+
+        if (bucketIndex >= 0) {
+          const keyParts = urlParts.slice(bucketIndex + 1);
+          const key = keyParts.join("/");
+          mockupUrl = `https://mockup-hudlab.s3.us-east-1.amazonaws.com/${key}`;
+          console.log("Corrected URL format:", mockupUrl);
+        }
+      }
     }
 
     console.log("Mockup generated successfully with Lambda:", mockupUrl);
@@ -194,15 +239,10 @@ async function generateMockupWithLambda(logoUrl, email, name, fileType = "") {
         error.message.includes("timeout") ||
         error.message.includes("ECONNABORTED"))
     ) {
-      console.warn(
-        "Lambda execution failed due to resource constraints or timeout. Using fallback mechanism..."
+      console.error(
+        "Lambda execution failed due to resource constraints or timeout. No mockup URL will be generated."
       );
-
-      // Generate a fallback mockup URL
-      const fallbackUrl = generateFallbackMockupUrl(email);
-      console.log("Generated fallback mockup URL:", fallbackUrl);
-
-      return fallbackUrl;
+      return null;
     }
 
     // For other errors, we'll still throw
@@ -210,28 +250,7 @@ async function generateMockupWithLambda(logoUrl, email, name, fileType = "") {
   }
 }
 
-/**
- * Generate a fallback mockup URL when Lambda fails
- * @param {string} email - Email of the user
- * @returns {string} - Fallback mockup URL
- */
-function generateFallbackMockupUrl(email) {
-  // CORREÇÃO CRÍTICA: Sempre gerar uma URL específica para o usuário, nunca usar a URL padrão
-
-  // Create a safe version of the email for use in the URL
-  const safeEmail = email.replace("@", "-at-").replace(".", "-dot-");
-  // Use Math.floor(Date.now() / 1000) to get seconds instead of milliseconds to match Lambda's format
-  const timestamp = Math.floor(Date.now() / 1000);
-
-  // Generate a URL that follows the same pattern as the Lambda-generated URLs
-  const correctUrl = `https://mockup-hudlab.s3.us-east-1.amazonaws.com/mockups/${safeEmail}-${timestamp}.png`;
-
-  console.log(`CORREÇÃO: Gerando URL específica para o usuário: ${email}`);
-  console.log(`URL gerada: ${correctUrl}`);
-
-  // Retornar sempre a URL específica para o usuário, nunca a URL padrão
-  return correctUrl;
-}
+// Função generateFallbackMockupUrl removida, pois não queremos mais gerar URLs fictícias
 
 /**
  * Save mockup URL to database or metadata
@@ -242,9 +261,6 @@ function generateFallbackMockupUrl(email) {
 async function saveMockupUrl(mockupUrl, email) {
   try {
     console.log(`Saving mockup URL for email: ${email}`);
-
-    // Generate a unique ID for the mockup
-    const mockupId = `mockup-${Date.now()}`;
 
     // In a production environment, you would save this to a database
     // For now, we'll just return the URL
@@ -259,5 +275,4 @@ async function saveMockupUrl(mockupUrl, email) {
 module.exports = {
   generateMockupWithLambda,
   saveMockupUrl,
-  generateFallbackMockupUrl,
 };

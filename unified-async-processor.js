@@ -86,23 +86,33 @@ function updateMockupUrlAsync(email, mockupUrl) {
     }
   }
 
-  // CORREÇÃO CRÍTICA: Se por algum motivo estamos com a URL padrão, substituir por uma URL específica para este usuário
-  if (finalMockupUrl.includes("default-mockup.png")) {
+  // IMPORTANTE: Não gerar URLs fictícias. Se a URL não parece válida, não enviar para o ActiveCampaign
+  if (!finalMockupUrl.includes("/mockups/")) {
+    console.error(
+      "ERRO CRÍTICO: A URL do mockup não contém o caminho '/mockups/' esperado. Não será enviada para o ActiveCampaign."
+    );
+    console.error("URL inválida:", finalMockupUrl);
+    return;
+  }
+
+  // Verificar se a URL parece ser uma URL direta do S3 válida
+  if (
+    !finalMockupUrl.match(
+      /https:\/\/mockup-hudlab\.s3\.[a-z0-9-]+\.amazonaws\.com\/mockups\/.+\.png/
+    )
+  ) {
     console.warn(
-      "ALERTA CRÍTICO: Detectada URL padrão 'default-mockup.png' no async processor. Substituindo por URL específica para este usuário."
+      "AVISO: A URL do mockup não parece ser uma URL direta válida do S3. Verificando formato..."
     );
 
-    // Create a safe version of the email for use in the URL
-    const safeEmail = email.replace("@", "-at-").replace(".", "-dot-");
-    // Use Math.floor(Date.now() / 1000) to get seconds instead of milliseconds to match Lambda's format
-    const timestamp = Math.floor(Date.now() / 1000);
-
-    // Generate a URL that follows the same pattern as the Lambda-generated URLs
-    finalMockupUrl = `https://mockup-hudlab.s3.us-east-1.amazonaws.com/mockups/${safeEmail}-${timestamp}.png`;
-
-    console.log(`URL corrigida no async processor: ${finalMockupUrl}`);
-    console.log(`Email do usuário: ${email}`);
-    console.log(`Timestamp usado: ${timestamp}`);
+    // Verificação adicional para garantir que é uma URL válida
+    if (!finalMockupUrl.endsWith(".png")) {
+      console.error(
+        "ERRO: A URL do mockup não termina com '.png'. Não será enviada para o ActiveCampaign."
+      );
+      console.error("URL inválida:", finalMockupUrl);
+      return;
+    }
   }
 
   // Use setTimeout to make this non-blocking
