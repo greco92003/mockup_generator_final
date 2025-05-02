@@ -27,9 +27,9 @@ def download_image_from_url(url):
             parsed_url = urllib.parse.urlparse(url)
             bucket_name = parsed_url.netloc.split('.')[0]  # Extrai o nome do bucket da URL
             object_key = parsed_url.path.lstrip('/')  # Remove a barra inicial
-
+            
             print(f"Parsed S3 URL - Bucket: {bucket_name}, Key: {object_key}")
-
+            
             # Baixar o objeto usando boto3
             response = s3.get_object(Bucket=bucket_name, Key=object_key)
             return BytesIO(response['Body'].read())
@@ -56,93 +56,24 @@ def download_image_from_s3(bucket, key):
         traceback.print_exc()
         raise
 
-def upload_image_to_s3(image_bytes, bucket, key, content_type='image/png', is_original=False, original_filename=None, is_pdf=False):
+def upload_image_to_s3(image_bytes, bucket, key, content_type='image/png'):
     """Upload an image to S3 and generate a pre-signed URL"""
     try:
-        # Preparar metadados para o arquivo
-        # Nota: boto3 adiciona automaticamente o prefixo x-amz-meta- aos metadados
-        # Importante usar nomes de chave em minúsculas e valores compatíveis com ASCII
-        metadata = {
-            "file-type": key.split('.')[-1].lower(),
-            "is-original": str(is_original).lower(),
-            "uncompressed": str(is_original).lower(),
-        }
-
-        # Adicionar nome do arquivo original se fornecido
-        if original_filename:
-            metadata["original-filename"] = original_filename
-
-        try:
-            # Verificar se o arquivo é um PNG convertido do PDF
-            is_converted_png = False
-
-            # Use the is_pdf flag from the request if available
-            if is_pdf:
-                is_converted_png = True
-                print(f"Using isPdf flag from request to mark as converted PNG")
-            elif key.endswith('.png'):
-                # Verificar se o nome do arquivo indica que foi convertido de PDF
-                if original_filename and (
-                    original_filename.lower().endswith('-converted.png') or
-                    '.pdf.png' in original_filename.lower() or
-                    'pdf-to-png' in original_filename.lower() or
-                    'converted-from' in str(metadata)
-                ):
-                    is_converted_png = True
-                    print(f"Detected PNG file converted from PDF based on filename: {original_filename}")
-
-            if is_converted_png:
-                metadata["is-original"] = "false"
-                metadata["uncompressed"] = "false"
-                metadata["converted-from"] = "pdf"
-                metadata["conversion-source"] = "pdf"
-                metadata["conversion-type"] = "cloudconvert"
-                print(f"Setting metadata for PNG file converted from PDF")
-
-            # Determinar se o arquivo está na pasta logo-uncompressed
-            is_in_uncompressed = 'logo-uncompressed/' in key
-
-            # Ajustar metadados com base na pasta
-            if is_in_uncompressed:
-                metadata["is-original"] = "true"
-                metadata["uncompressed"] = "true"
-
-            # Verificar se o tamanho total dos metadados não excede 2KB
-            metadata_size = sum(len(key) + len(str(value)) for key, value in metadata.items())
-            if metadata_size > 2048:
-                print(f"Warning: Metadata size ({metadata_size} bytes) exceeds 2KB limit. Some metadata may be truncated.")
-                # Remover metadados menos importantes se necessário
-                if "conversion-source" in metadata:
-                    del metadata["conversion-source"]
-                if "conversion-type" in metadata:
-                    del metadata["conversion-type"]
-        except Exception as metadata_error:
-            print(f"Error setting metadata: {str(metadata_error)}")
-            # Continuar com o upload mesmo se houver erro nos metadados
-            # Definir metadados mínimos
-            metadata = {
-                "file-type": key.split('.')[-1].lower(),
-                "is-original": str(is_original).lower(),
-            }
-
-        print(f"Uploading file with metadata: {metadata}")
-
         # Upload the image to S3 (without ACL since bucket is private)
         s3.put_object(
             Body=image_bytes,
             Bucket=bucket,
             Key=key,
-            ContentType=content_type,
-            Metadata=metadata
+            ContentType=content_type
         )
-
+        
         # Generate a pre-signed URL that expires in 7 days
         url = s3.generate_presigned_url(
             'get_object',
             Params={'Bucket': bucket, 'Key': key},
             ExpiresIn=URL_EXPIRATION
         )
-
+        
         print(f"Generated pre-signed URL: {url}")
         return url
     except Exception as e:
@@ -154,34 +85,33 @@ def upload_image_to_s3(image_bytes, bucket, key, content_type='image/png', is_or
 def resize_image_with_aspect_ratio(image, max_width, max_height):
     """Resize an image maintaining aspect ratio"""
     width, height = image.size
-
+    
     # Calculate the ratio
     if width > max_width or height > max_height:
         ratio = min(max_width / width, max_height / height)
         new_width = int(width * ratio)
         new_height = int(height * ratio)
         return image.resize((new_width, new_height), Image.LANCZOS)
-
+    
     return image
 
-def create_mockup(logo_url, email, name, is_pdf=False):
+def create_mockup(logo_url, email, name):
     """Create a mockup with the logo placed on the background"""
     try:
         print(f"Creating mockup for {email} with logo {logo_url}")
-        print(f"Is PDF flag: {is_pdf}")
-
+        
         # Download the background image from S3
         print(f"Downloading background from S3: {S3_BUCKET}/{BACKGROUND_KEY}")
         background_bytes = download_image_from_s3(S3_BUCKET, BACKGROUND_KEY)
         background = Image.open(background_bytes).convert("RGBA")
         print(f"Background size: {background.size}")
-
+        
         # Download the logo from the provided URL
         print(f"Downloading logo from URL: {logo_url}")
         logo_bytes = download_image_from_url(logo_url)
         logo = Image.open(logo_bytes).convert("RGBA")
         print(f"Original logo size: {logo.size}")
-
+        
         # Define positions for slippers and labels
         slipper_positions = [
             (306, 330), (487, 330),  # Par 1
@@ -191,7 +121,7 @@ def create_mockup(logo_url, email, name, is_pdf=False):
             (895, 789), (1077, 789),  # Par 5
             (1533, 789), (1713, 789),  # Par 6
         ]
-
+        
         label_positions = [
             (154, 367),  # Etiqueta Par 1
             (738, 367),  # Etiqueta Par 2
@@ -200,22 +130,22 @@ def create_mockup(logo_url, email, name, is_pdf=False):
             (738, 825),  # Etiqueta Par 5
             (1377, 825),  # Etiqueta Par 6
         ]
-
+        
         # Define size limits
         slipper_width, slipper_height = 163, 100
         label_width, label_height = 64, 60
-
+        
         # Resize logo for slippers
         slipper_logo = resize_image_with_aspect_ratio(logo.copy(), slipper_width, slipper_height)
         print(f"Resized slipper logo size: {slipper_logo.size}")
-
+        
         # Resize logo for labels
         label_logo = resize_image_with_aspect_ratio(logo.copy(), label_width, label_height)
         print(f"Resized label logo size: {label_logo.size}")
-
+        
         # Create a copy of the background for compositing
         result = background.copy()
-
+        
         # Place logos on the background for slippers
         print("Placing slipper logos on background")
         for pos in slipper_positions:
@@ -228,7 +158,7 @@ def create_mockup(logo_url, email, name, is_pdf=False):
             temp.paste(slipper_logo, (paste_x, paste_y), slipper_logo)
             # Composite the temporary image with the result
             result = Image.alpha_composite(result, temp)
-
+        
         # Place logos on the background for labels
         print("Placing label logos on background")
         for pos in label_positions:
@@ -241,35 +171,26 @@ def create_mockup(logo_url, email, name, is_pdf=False):
             temp.paste(label_logo, (paste_x, paste_y), label_logo)
             # Composite the temporary image with the result
             result = Image.alpha_composite(result, temp)
-
+        
         # Convert to RGB for saving as PNG
         result = result.convert("RGB")
-
+        
         # Save the result to a BytesIO object
         print("Saving mockup to BytesIO")
         output = BytesIO()
         result.save(output, format='PNG', quality=95)
         output.seek(0)
-
+        
         # Generate a unique key for the mockup
         timestamp = int(time.time())
         safe_email = email.replace('@', '-at-').replace('.', '-dot-')
         mockup_key = f"mockups/{safe_email}-{timestamp}.png"
-
+        
         # Upload the mockup to S3 and get a pre-signed URL
         print(f"Uploading mockup to S3: {S3_BUCKET}/{mockup_key}")
-        # Mockups são sempre arquivos originais gerados pelo sistema
-        mockup_url = upload_image_to_s3(
-            output.getvalue(),
-            S3_BUCKET,
-            mockup_key,
-            content_type='image/png',
-            is_original=True,
-            original_filename=f"mockup-{email}-{timestamp}.png",
-            is_pdf=is_pdf  # Pass the is_pdf flag to the upload function
-        )
+        mockup_url = upload_image_to_s3(output.getvalue(), S3_BUCKET, mockup_key)
         print(f"Mockup URL (pre-signed): {mockup_url}")
-
+        
         return {
             'statusCode': 200,
             'headers': {
@@ -284,7 +205,7 @@ def create_mockup(logo_url, email, name, is_pdf=False):
                 'expiresIn': URL_EXPIRATION
             })
         }
-
+    
     except Exception as e:
         print(f"Error creating mockup: {str(e)}")
         import traceback
@@ -304,7 +225,7 @@ def lambda_handler(event, context):
     """AWS Lambda handler function"""
     try:
         print(f"Received event: {json.dumps(event)}")
-
+        
         # Parse the input
         if 'body' in event:
             try:
@@ -313,16 +234,13 @@ def lambda_handler(event, context):
                 body = event['body']  # In case it's already parsed
         else:
             body = event
-
+        
         print(f"Parsed body: {json.dumps(body)}")
-
+        
         logo_url = body.get('logoUrl')
         email = body.get('email')
         name = body.get('name', 'Unknown')
-        is_pdf = body.get('isPdf', False)  # Get the isPdf flag, default to False if not provided
-
-        print(f"isPdf flag from request: {is_pdf}")
-
+        
         # Validate input
         if not logo_url or not email:
             print("Missing required parameters")
@@ -336,10 +254,10 @@ def lambda_handler(event, context):
                     'message': 'Missing required parameters: logoUrl and email are required'
                 })
             }
-
+        
         # Create the mockup
-        return create_mockup(logo_url, email, name, is_pdf)
-
+        return create_mockup(logo_url, email, name)
+    
     except Exception as e:
         print(f"Error processing request: {str(e)}")
         import traceback

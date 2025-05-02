@@ -8,11 +8,9 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "server": "node server.js",
-    "start": "node active-campaign-mockup.js",
-    "manychat": "node manychat-mockup.js",
-    "integrated": "node integrated-mockup.js",
-    "prod": "NODE_ENV=production node active-campaign-mockup.js"
+    "server": "node unified-server.js",
+    "start": "node unified-server.js",
+    "prod": "NODE_ENV=production node unified-server.js"
   },
   "dependencies": {
     "aws-sdk": "^2.1692.0",

@@ -1,0 +1,510 @@
+/**
+ * Unified S3 Storage Module
+ *
+ * This module provides functions for uploading files to AWS S3 and generating pre-signed URLs.
+ */
+
+const AWS = require("aws-sdk");
+const fs = require("fs");
+const path = require("path");
+const { v4: uuidv4 } = require("uuid");
+const dotenv = require("dotenv");
+
+// Load environment variables
+dotenv.config();
+
+// Configure AWS SDK
+AWS.config.update({
+  region: process.env.AWS_REGION || "us-east-1",
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+});
+
+// Initialize S3 client
+const s3 = new AWS.S3();
+
+// Default expiration time for pre-signed URLs (7 days in seconds)
+const DEFAULT_EXPIRATION = 7 * 24 * 60 * 60;
+
+/**
+ * Upload a file to S3
+ * @param {Buffer} fileBuffer - File buffer to upload
+ * @param {string} fileName - Original file name
+ * @param {string} folder - Folder to upload to
+ * @param {boolean} isUncompressed - Whether this is an uncompressed original file
+ * @returns {Promise<object>} - S3 upload result with URL
+ */
+async function uploadToS3(
+  fileBuffer,
+  fileName,
+  folder = "logos",
+  isUncompressed = false
+) {
+  try {
+    console.log(`Uploading file to S3: ${fileName}`);
+
+    // Get file extension
+    const fileExtension = fileName.split(".").pop().toLowerCase();
+
+    // Check if this is a PDF file
+    const isPdf = fileExtension === "pdf";
+
+    // Check if this is a PNG converted from PDF
+    const isPngFromCloudConvert =
+      fileExtension === "png" &&
+      (fileName.toLowerCase().includes("converted") ||
+        fileName.toLowerCase().includes("pdf-to-png") ||
+        fileName.toLowerCase().match(/\.pdf\.png$/) ||
+        fileName.toLowerCase().endsWith("-converted.png"));
+
+    // If this is a converted PNG and it's being uploaded to logo-uncompressed or logo-pdf,
+    // redirect it to the logos folder instead
+    if (
+      isPngFromCloudConvert &&
+      (folder === "logo-uncompressed" || folder === "logo-pdf")
+    ) {
+      console.log(`Detected converted PNG being uploaded to ${folder} folder`);
+      console.log(`Redirecting to logos folder instead`);
+      folder = "logos";
+      isUncompressed = false;
+    }
+
+    // Handle PDF files - they should go to logo-pdf folder
+    if (isPdf && isUncompressed) {
+      folder = "logo-pdf";
+      console.log(`Using logo-pdf folder for original PDF file`);
+    }
+    // Handle JPG/PNG files - they should go to logo-uncompressed folder if marked as uncompressed
+    else if (!isPdf && isUncompressed && folder !== "logo-uncompressed") {
+      folder = "logo-uncompressed";
+      console.log(`Using logo-uncompressed folder for original JPG/PNG file`);
+    }
+    // If folder is already set to logo-uncompressed or logo-pdf, keep it
+    else if (folder === "logo-uncompressed" || folder === "logo-pdf") {
+      console.log(`Folder already set to ${folder}, keeping it`);
+    }
+
+    // Ensure PNG files from PDF conversion go to logos folder, not logo-pdf
+    if (isPngFromCloudConvert && folder === "logo-pdf") {
+      folder = "logos";
+      console.log(`Redirecting converted PNG from logo-pdf to logos folder`);
+      isUncompressed = false;
+    }
+
+    // Generate a unique ID for the file
+    const fileId = uuidv4();
+    const key = `${folder}/${fileId}.${fileExtension}`;
+
+    // Determine content type
+    let contentType;
+    switch (fileExtension) {
+      case "jpg":
+      case "jpeg":
+        contentType = "image/jpeg";
+        break;
+      case "png":
+        contentType = "image/png";
+        break;
+      case "pdf":
+        contentType = "application/pdf";
+        break;
+      default:
+        contentType = "application/octet-stream";
+    }
+
+    // Upload parameters
+    const params = {
+      Bucket: process.env.S3_BUCKET || "mockup-hudlab",
+      Key: key,
+      Body: fileBuffer,
+      ContentType: contentType,
+    };
+
+    // Add metadata for all files
+    params.Metadata = {
+      "original-filename": fileName,
+      "file-type": fileExtension,
+    };
+
+    // Check if this is a PNG converted from PDF
+    const isPngFromCloudConvert =
+      fileExtension === "png" &&
+      (fileName.toLowerCase().includes("converted") ||
+        fileName.toLowerCase().includes("pdf-to-png") ||
+        fileName.toLowerCase().match(/\.pdf\.png$/) ||
+        fileName.toLowerCase().endsWith("-converted.png"));
+
+    // Add appropriate metadata based on file type and source
+    if (isPngFromCloudConvert) {
+      // Add metadata for converted files
+      params.Metadata.uncompressed = "false";
+      params.Metadata["is-original"] = "false";
+      params.Metadata["converted-from"] = "pdf";
+      params.Metadata["conversion-source"] = "pdf";
+      params.Metadata["conversion-type"] = "cloudconvert";
+    } else if (isUncompressed || folder === "logo-uncompressed") {
+      // Add metadata for uncompressed original files
+      params.Metadata.uncompressed = "true";
+      params.Metadata["is-original"] = "true";
+    } else {
+      // Add metadata for processed files
+      params.Metadata.uncompressed = "false";
+      params.Metadata["is-original"] = "false";
+    }
+
+    // Check if metadata size exceeds 2KB limit
+    const metadataSize = Object.entries(params.Metadata).reduce(
+      (size, [key, value]) => size + key.length + (value ? value.length : 0),
+      0
+    );
+
+    if (metadataSize > 2048) {
+      console.warn(
+        `Metadata size (${metadataSize} bytes) exceeds 2KB limit. Some metadata may be truncated.`
+      );
+      // Remove less important metadata if necessary
+      delete params.Metadata["conversion-source"];
+      delete params.Metadata["conversion-type"];
+    }
+
+    // Upload to S3
+    const result = await s3.upload(params).promise();
+
+    console.log("File uploaded to S3:");
+    console.log("- Location:", result.Location);
+    console.log("- Key:", result.Key);
+    console.log("- Folder:", folder);
+
+    // Create a result object with additional information
+    const uploadResult = {
+      url: result.Location,
+      directUrl: result.Location,
+      key: result.Key,
+      contentType: contentType,
+      fileExtension: fileExtension,
+      isOriginalUncompressed: isUncompressed || folder === "logo-uncompressed",
+      originalFileName: fileName,
+      folder: folder,
+    };
+
+    return uploadResult;
+  } catch (error) {
+    console.error("Error uploading to S3:", error);
+    throw error;
+  }
+}
+
+/**
+ * Upload a file from disk to S3
+ * @param {string} filePath - Path to the file to upload
+ * @param {string} fileName - Name to save the file as (optional, uses original filename if not provided)
+ * @param {string} folder - Folder to upload to
+ * @param {boolean} isUncompressed - Whether this is an uncompressed original file
+ * @returns {Promise<object>} - S3 upload result with URL
+ */
+async function uploadFileToS3(
+  filePath,
+  fileName = null,
+  folder = "mockups",
+  isUncompressed = false
+) {
+  try {
+    console.log(`Uploading file to S3 from path: ${filePath}`);
+
+    // Read file content
+    const fileContent = fs.readFileSync(filePath);
+
+    // Use provided fileName or extract from filePath
+    const actualFileName = fileName || path.basename(filePath);
+
+    // Upload to S3
+    const result = await uploadToS3(
+      fileContent,
+      actualFileName,
+      folder,
+      isUncompressed
+    );
+
+    console.log("File uploaded to S3:", result.url);
+
+    return result;
+  } catch (error) {
+    console.error("Error in uploadFileToS3:", error);
+    throw error;
+  }
+}
+
+/**
+ * Generate a pre-signed URL for an S3 object
+ * @param {string} key - S3 object key
+ * @param {number} expirationSeconds - Expiration time in seconds (default: 7 days)
+ * @returns {Promise<string>} - Pre-signed URL
+ */
+async function generatePresignedUrl(
+  key,
+  expirationSeconds = DEFAULT_EXPIRATION
+) {
+  try {
+    console.log(`Generating pre-signed URL for S3 object: ${key}`);
+    console.log(
+      `URL will expire in ${expirationSeconds} seconds (${Math.round(
+        expirationSeconds / 86400
+      )} days)`
+    );
+
+    const params = {
+      Bucket: process.env.S3_BUCKET || "mockup-hudlab",
+      Key: key,
+      Expires: expirationSeconds,
+    };
+
+    const presignedUrl = await s3.getSignedUrlPromise("getObject", params);
+
+    console.log(
+      `Pre-signed URL generated: ${presignedUrl.substring(0, 100)}...`
+    );
+
+    return presignedUrl;
+  } catch (error) {
+    console.error("Error generating pre-signed URL:", error);
+    throw error;
+  }
+}
+
+/**
+ * Get a pre-signed URL for an existing S3 object
+ * @param {string} url - S3 object URL
+ * @param {number} expirationSeconds - Expiration time in seconds (default: 7 days)
+ * @returns {Promise<string>} - Pre-signed URL
+ */
+async function getPresignedUrlFromS3Url(
+  url,
+  expirationSeconds = DEFAULT_EXPIRATION
+) {
+  try {
+    console.log(`Getting pre-signed URL for S3 URL: ${url}`);
+
+    // Extract the key from the S3 URL
+    const urlObj = new URL(url);
+    let key = "";
+    let bucket = process.env.S3_BUCKET || "mockup-hudlab";
+
+    // Handle different S3 URL formats
+    if (urlObj.hostname.includes("s3.amazonaws.com")) {
+      // Format: https://bucket-name.s3.amazonaws.com/key
+      key = urlObj.pathname.substring(1); // Remove leading slash
+    } else if (
+      urlObj.hostname.includes("s3.") &&
+      urlObj.hostname.includes(".amazonaws.com")
+    ) {
+      // Format: https://bucket-name.s3.region.amazonaws.com/key
+      key = urlObj.pathname.substring(1); // Remove leading slash
+    } else if (
+      urlObj.hostname === "s3.amazonaws.com" ||
+      urlObj.hostname.match(/s3\.[a-z0-9-]+\.amazonaws\.com/)
+    ) {
+      // Format: https://s3.region.amazonaws.com/bucket-name/key
+      const pathParts = urlObj.pathname.substring(1).split("/");
+      bucket = pathParts[0];
+      key = pathParts.slice(1).join("/");
+    } else {
+      // Try to extract key from pathname
+      key = urlObj.pathname.substring(1); // Remove leading slash
+    }
+
+    // Generate pre-signed URL with explicit bucket and key
+    const params = {
+      Bucket: bucket,
+      Key: key,
+      Expires: expirationSeconds,
+    };
+
+    const presignedUrl = await s3.getSignedUrlPromise("getObject", params);
+
+    console.log(
+      `Pre-signed URL generated: ${presignedUrl.substring(0, 100)}...`
+    );
+    console.log(
+      `URL will expire in ${expirationSeconds} seconds (${Math.round(
+        expirationSeconds / 86400
+      )} days)`
+    );
+
+    return presignedUrl;
+  } catch (error) {
+    console.error("Error getting pre-signed URL from S3 URL:", error);
+    throw error;
+  }
+}
+
+/**
+ * Save mockup to S3 Storage or local directory based on environment
+ * @param {string} mockupPath - Path to the mockup file
+ * @param {string} email - Email of the user
+ * @param {object} metadata - Additional metadata to store
+ * @returns {Promise<string>} - Public URL of the mockup
+ */
+async function saveMockup(mockupPath, email, metadata = {}) {
+  try {
+    const fileName = `mockup-${Date.now()}.png`;
+
+    // Check if we're in production
+    if (process.env.NODE_ENV === "production") {
+      try {
+        // Try to upload to S3
+        const result = await uploadFileToS3(mockupPath, fileName);
+        return result.url;
+      } catch (s3Error) {
+        console.error(
+          "Error uploading to S3, falling back to local storage:",
+          s3Error
+        );
+        // Fall back to local storage if S3 fails
+      }
+    }
+
+    // Local storage fallback
+    const mockupsDir = path.join(__dirname, "public", "mockups");
+    if (!fs.existsSync(mockupsDir)) {
+      fs.mkdirSync(mockupsDir, { recursive: true });
+    }
+
+    const fileContent = fs.readFileSync(mockupPath);
+    const filePath = path.join(mockupsDir, fileName);
+
+    // Write file to public directory
+    fs.writeFileSync(filePath, fileContent);
+
+    // Generate public URL
+    let baseUrl;
+    if (process.env.NODE_ENV === "production") {
+      baseUrl = process.env.BASE_URL || "https://seu-dominio.com";
+    } else {
+      baseUrl = `http://localhost:${process.env.PORT || 3000}`;
+    }
+    const publicUrl = `${baseUrl}/mockups/${fileName}`;
+
+    console.log("Mockup saved to public directory:", publicUrl);
+
+    // Save metadata to JSON file
+    const metadataPath = path.join(mockupsDir, "metadata.json");
+    let metadataCollection = [];
+
+    if (fs.existsSync(metadataPath)) {
+      try {
+        metadataCollection = JSON.parse(fs.readFileSync(metadataPath, "utf8"));
+      } catch (error) {
+        console.error("Error reading metadata file:", error);
+      }
+    }
+
+    metadataCollection.push({
+      email,
+      fileName,
+      url: publicUrl,
+      created_at: new Date().toISOString(),
+      ...metadata,
+    });
+
+    fs.writeFileSync(metadataPath, JSON.stringify(metadataCollection, null, 2));
+
+    return publicUrl;
+  } catch (error) {
+    console.error("Error saving mockup:", error);
+    throw error;
+  }
+}
+
+/**
+ * Delete PNG files from logo-pdf folder that were created from PDF conversion
+ * @param {string} pdfFilename - Original PDF filename
+ * @returns {Promise<void>}
+ */
+async function cleanupLogoPdfFolder(pdfFilename) {
+  try {
+    console.log(`Cleaning up logo-pdf folder for PDF: ${pdfFilename}`);
+
+    // Extract the base name without extension
+    const baseName = pdfFilename.replace(/\.pdf$/i, "");
+
+    // Folder to clean up
+    const folder = "logo-pdf";
+    console.log(`Cleaning up ${folder} folder...`);
+
+    // List objects in the folder
+    const params = {
+      Bucket: process.env.S3_BUCKET || "mockup-hudlab",
+      Prefix: `${folder}/`,
+    };
+
+    const listedObjects = await s3.listObjectsV2(params).promise();
+
+    if (listedObjects.Contents.length === 0) {
+      console.log(`No objects found in ${folder} folder`);
+      return;
+    }
+
+    // Find PNG files that match the PDF name pattern
+    const pngFilesToDelete = listedObjects.Contents.filter((obj) => {
+      const key = obj.Key;
+      // Check if this is a PNG file
+      if (!key.toLowerCase().endsWith(".png")) {
+        return false;
+      }
+
+      // Check if this PNG file is related to our PDF
+      // This is a heuristic - we're looking for PNG files that might have been
+      // created from our PDF based on naming patterns
+      const keyBaseName = key
+        .split("/")
+        .pop()
+        .replace(/\.png$/i, "");
+
+      return (
+        key.includes(baseName) ||
+        key.includes(pdfFilename) ||
+        key.includes(`${baseName}.pdf`) ||
+        key.includes(`${baseName}-converted`) ||
+        key.includes(`${baseName}.pdf.png`)
+      );
+    });
+
+    if (pngFilesToDelete.length === 0) {
+      console.log(
+        `No PNG files found in ${folder} folder that match the PDF name pattern`
+      );
+      return;
+    }
+
+    console.log(
+      `Found ${pngFilesToDelete.length} PNG files to delete from ${folder} folder`
+    );
+
+    // Delete each PNG file
+    for (const obj of pngFilesToDelete) {
+      console.log(`Deleting file: ${obj.Key}`);
+      await s3
+        .deleteObject({
+          Bucket: process.env.S3_BUCKET || "mockup-hudlab",
+          Key: obj.Key,
+        })
+        .promise();
+    }
+
+    console.log(`Cleanup of ${folder} folder completed successfully`);
+  } catch (error) {
+    console.error("Error cleaning up logo-pdf folder:", error);
+    // We don't want to throw the error as this is a cleanup operation
+    // and shouldn't affect the main workflow
+  }
+}
+
+module.exports = {
+  uploadToS3,
+  uploadFileToS3,
+  generatePresignedUrl,
+  getPresignedUrlFromS3Url,
+  saveMockup,
+  cleanupLogoPdfFolder,
+  DEFAULT_EXPIRATION,
+};

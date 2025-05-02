@@ -2,14 +2,14 @@
   "version": 2,
   "builds": [
     {
-      "src": "active-campaign-mockup.js",
+      "src": "unified-server.js",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "/active-campaign-mockup.js"
+      "dest": "/unified-server.js"
     }
   ]
 }
