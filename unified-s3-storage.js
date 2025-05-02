@@ -126,13 +126,8 @@ async function uploadToS3(
       "file-type": fileExtension,
     };
 
-    // Check if this is a PNG converted from PDF
-    const isPngFromCloudConvert =
-      fileExtension === "png" &&
-      (fileName.toLowerCase().includes("converted") ||
-        fileName.toLowerCase().includes("pdf-to-png") ||
-        fileName.toLowerCase().match(/\.pdf\.png$/) ||
-        fileName.toLowerCase().endsWith("-converted.png"));
+    // Reuse the isPngFromCloudConvert variable defined earlier
+    // No need to redefine it here
 
     // Add appropriate metadata based on file type and source
     if (isPngFromCloudConvert) {
