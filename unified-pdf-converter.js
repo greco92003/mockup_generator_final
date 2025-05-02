@@ -14,8 +14,18 @@ const dotenv = require("dotenv");
 dotenv.config();
 
 // Initialize CloudConvert with API key from environment variables
+// Make sure we're not including the variable name in the API key
+const apiKey = process.env.CLOUDCONVERT_API_KEY || "";
+// Remove any "CLOUDCONVERT_API_KEY=" prefix if it exists
+const cleanApiKey = apiKey.replace(/^CLOUDCONVERT_API_KEY=/, "");
+
+console.log(
+  "Initializing CloudConvert with API key (first 10 chars):",
+  cleanApiKey.substring(0, 10) + "..."
+);
+
 const cloudConvert = new CloudConvert(
-  process.env.CLOUDCONVERT_API_KEY || "",
+  cleanApiKey,
   false // false = production mode
 );
 
@@ -144,7 +154,30 @@ async function pdfBufferToPng(buffer, filename, options = {}) {
     return localPath;
   } catch (error) {
     console.error("Error converting PDF to PNG:", error);
-    throw error;
+
+    // Add more detailed error information
+    if (error.response) {
+      // The request was made and the server responded with a status code
+      // that falls out of the range of 2xx
+      console.error("CloudConvert API Error Response:");
+      console.error("Status:", error.response.status);
+      console.error("Data:", JSON.stringify(error.response.data, null, 2));
+      console.error(
+        "Headers:",
+        JSON.stringify(error.response.headers, null, 2)
+      );
+    } else if (error.request) {
+      // The request was made but no response was received
+      console.error("CloudConvert API No Response Error:");
+      console.error("Request:", error.request);
+    } else {
+      // Something happened in setting up the request that triggered an Error
+      console.error("CloudConvert API Setup Error:", error.message);
+    }
+
+    console.error("Stack trace:", error.stack);
+
+    throw new Error(`PDF to PNG conversion failed: ${error.message}`);
   }
 }
 
@@ -166,7 +199,12 @@ async function pdfFileToPng(filePath, options = {}) {
     return await pdfBufferToPng(buffer, filename, options);
   } catch (error) {
     console.error("Error converting PDF file to PNG:", error);
-    throw error;
+    console.error("Stack trace:", error.stack);
+
+    // Provide more context in the error message
+    throw new Error(
+      `PDF file to PNG conversion failed for ${filePath}: ${error.message}`
+    );
   }
 }
 

@@ -1,6 +1,6 @@
 /**
  * Unified Mockup Generator Module
- * 
+ *
  * This module provides functions for generating mockups using Jimp.
  * It combines functionality from various mockup generation files in the project.
  */
@@ -16,15 +16,24 @@ const dotenv = require("dotenv");
 dotenv.config();
 
 // Initialize CloudConvert with API key from environment variables
+// Make sure we're not including the variable name in the API key
+const apiKey = process.env.CLOUDCONVERT_API_KEY || "";
+// Remove any "CLOUDCONVERT_API_KEY=" prefix if it exists
+const cleanApiKey = apiKey.replace(/^CLOUDCONVERT_API_KEY=/, "");
+
+console.log(
+  "Mockup Generator: Initializing CloudConvert with API key (first 10 chars):",
+  cleanApiKey.substring(0, 10) + "..."
+);
+
 const cloudConvert = new CloudConvert(
-  process.env.CLOUDCONVERT_API_KEY || "",
+  cleanApiKey,
   false // false = production mode
 );
 
 // Define directories
-const tempDir = process.env.NODE_ENV === "production" 
-  ? "/tmp" 
-  : path.join(__dirname, "temp");
+const tempDir =
+  process.env.NODE_ENV === "production" ? "/tmp" : path.join(__dirname, "temp");
 
 // Ensure temp directory exists
 if (!fs.existsSync(tempDir)) {
@@ -44,8 +53,8 @@ async function pdfBufferToPng(buffer, filename) {
     // Create job (upload + convert + export)
     const job = await cloudConvert.jobs.create({
       tasks: {
-        upload_logo: { 
-          operation: "import/upload" 
+        upload_logo: {
+          operation: "import/upload",
         },
         convert_logo: {
           operation: "convert",
@@ -64,7 +73,7 @@ async function pdfBufferToPng(buffer, filename) {
           input: "convert_logo",
           metadata: {
             "is-original": "false",
-            "uncompressed": "false",
+            uncompressed: "false",
             "file-type": "png",
             "original-filename": filename.replace(/\.pdf$/i, ".png"),
             "converted-from": filename,
@@ -72,9 +81,9 @@ async function pdfBufferToPng(buffer, filename) {
             "conversion-type": "cloudconvert",
           },
         },
-        export_logo: { 
-          operation: "export/url", 
-          input: "add_metadata" 
+        export_logo: {
+          operation: "export/url",
+          input: "add_metadata",
         },
       },
     });
@@ -115,7 +124,32 @@ async function pdfBufferToPng(buffer, filename) {
     return localPath;
   } catch (error) {
     console.error("Error converting PDF to PNG:", error);
-    throw error;
+
+    // Add more detailed error information
+    if (error.response) {
+      // The request was made and the server responded with a status code
+      // that falls out of the range of 2xx
+      console.error("CloudConvert API Error Response:");
+      console.error("Status:", error.response.status);
+      console.error("Data:", JSON.stringify(error.response.data, null, 2));
+      console.error(
+        "Headers:",
+        JSON.stringify(error.response.headers, null, 2)
+      );
+    } else if (error.request) {
+      // The request was made but no response was received
+      console.error("CloudConvert API No Response Error:");
+      console.error("Request:", error.request);
+    } else {
+      // Something happened in setting up the request that triggered an Error
+      console.error("CloudConvert API Setup Error:", error.message);
+    }
+
+    console.error("Stack trace:", error.stack);
+
+    throw new Error(
+      `PDF to PNG conversion failed in mockup generator: ${error.message}`
+    );
   }
 }
 
@@ -200,7 +234,9 @@ async function generateMockup(logoPath, options = {}) {
     }
 
     // Resize logos for slippers and labels
-    const slipperLogo = logo.clone().resize(finalSlipperWidth, finalSlipperHeight);
+    const slipperLogo = logo
+      .clone()
+      .resize(finalSlipperWidth, finalSlipperHeight);
     const labelLogo = logo.clone().resize(finalLabelWidth, finalLabelHeight);
 
     // Define center positions for slippers
@@ -256,14 +292,14 @@ async function generateMockupBuffer(logoPath, options = {}) {
   try {
     const mockupPath = await generateMockup(logoPath, options);
     const buffer = fs.readFileSync(mockupPath);
-    
+
     // Clean up the temporary file
     try {
       fs.unlinkSync(mockupPath);
     } catch (cleanupError) {
       console.error("Error cleaning up temporary mockup file:", cleanupError);
     }
-    
+
     return buffer;
   } catch (error) {
     console.error("Error generating mockup buffer:", error);
@@ -275,5 +311,5 @@ module.exports = {
   pdfBufferToPng,
   generateMockup,
   generateMockupBuffer,
-  tempDir
+  tempDir,
 };
