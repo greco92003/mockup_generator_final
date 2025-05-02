@@ -13,9 +13,8 @@ const activeCampaign = require("./unified-active-campaign-api");
 function processLeadBasicInfoAsync(leadData) {
   console.log(`Processing lead basic info asynchronously: ${leadData.email}`);
 
-  // Use immediate Promise execution instead of setTimeout for faster processing
-  // This is still non-blocking but starts immediately
-  Promise.resolve().then(async () => {
+  // Use setTimeout to make this non-blocking
+  setTimeout(async () => {
     try {
       await activeCampaign.processLeadBasicInfo(leadData);
       console.log(
@@ -24,7 +23,7 @@ function processLeadBasicInfoAsync(leadData) {
     } catch (error) {
       console.error("Error processing lead basic info (async):", error);
     }
-  });
+  }, 100);
 }
 
 /**
@@ -116,8 +115,8 @@ function updateMockupUrlAsync(email, mockupUrl) {
     }
   }
 
-  // Use immediate Promise execution instead of setTimeout for faster processing
-  Promise.resolve().then(async () => {
+  // Use setTimeout to make this non-blocking
+  setTimeout(async () => {
     try {
       console.log(`Starting async update of mockup URL for ${email}`);
       console.log(
@@ -134,7 +133,7 @@ function updateMockupUrlAsync(email, mockupUrl) {
       console.error("Error details:", error.message);
       console.error("Stack trace:", error.stack);
     }
-  });
+  }, 100);
 }
 
 /**
@@ -151,8 +150,8 @@ function updateLogoUrlAsync(email, logoUrl) {
     return;
   }
 
-  // Use immediate Promise execution instead of setTimeout for faster processing
-  Promise.resolve().then(async () => {
+  // Use setTimeout to make this non-blocking
+  setTimeout(async () => {
     try {
       console.log(`Starting async update of logo URL for ${email}`);
       const result = await activeCampaign.updateLeadLogoUrl(email, logoUrl);
@@ -163,7 +162,7 @@ function updateLogoUrlAsync(email, logoUrl) {
       console.error("Error details:", error.message);
       console.error("Stack trace:", error.stack);
     }
-  });
+  }, 100);
 }
 
 /**
@@ -176,8 +175,8 @@ function processLeadWithMockupAsync(leadData, mockupUrl) {
     `Processing lead with mockup URL asynchronously: ${leadData.email}`
   );
 
-  // Use immediate Promise execution instead of setTimeout for faster processing
-  Promise.resolve().then(async () => {
+  // Use setTimeout to make this non-blocking
+  setTimeout(async () => {
     try {
       await activeCampaign.processLeadWithMockup(leadData, mockupUrl);
       console.log(
@@ -186,7 +185,7 @@ function processLeadWithMockupAsync(leadData, mockupUrl) {
     } catch (error) {
       console.error("Error processing lead with mockup (async):", error);
     }
-  });
+  }, 100);
 }
 
 module.exports = {
