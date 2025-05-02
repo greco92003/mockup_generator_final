@@ -64,6 +64,28 @@ function updateMockupUrlAsync(email, mockupUrl) {
     console.log("Fixed URL with region:", finalMockupUrl);
   }
 
+  // Ensure the URL is using the correct bucket format
+  if (!finalMockupUrl.includes("mockup-hudlab.s3.us-east-1.amazonaws.com")) {
+    // Check if it's using a different format but still our bucket
+    if (
+      finalMockupUrl.includes("mockup-hudlab") &&
+      finalMockupUrl.includes("amazonaws.com")
+    ) {
+      console.log("URL is using incorrect format, fixing...");
+      // Extract the key part (everything after the bucket name)
+      const urlParts = finalMockupUrl.split("/");
+      const bucketIndex = urlParts.findIndex((part) =>
+        part.includes("mockup-hudlab")
+      );
+      if (bucketIndex >= 0) {
+        const keyParts = urlParts.slice(bucketIndex + 1);
+        const key = keyParts.join("/");
+        finalMockupUrl = `https://mockup-hudlab.s3.us-east-1.amazonaws.com/${key}`;
+        console.log("Corrected URL format:", finalMockupUrl);
+      }
+    }
+  }
+
   // Use setTimeout to make this non-blocking
   setTimeout(async () => {
     try {

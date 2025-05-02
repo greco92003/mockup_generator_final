@@ -151,6 +151,28 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
       mockupUrl = awsLambdaConfig.generateFallbackMockupUrl(email);
     }
 
+    // Ensure mockupUrl is a direct URL without query parameters
+    if (mockupUrl && mockupUrl.includes("?")) {
+      console.log("Converting mockupUrl from pre-signed to direct URL");
+      console.log("Original mockupUrl:", mockupUrl);
+      mockupUrl = mockupUrl.split("?")[0];
+      console.log("Direct mockupUrl:", mockupUrl);
+    }
+
+    // Ensure the URL includes the region
+    if (
+      mockupUrl &&
+      mockupUrl.includes("s3.amazonaws.com") &&
+      !mockupUrl.includes("s3.us-east-1.amazonaws.com")
+    ) {
+      console.log("Fixing S3 URL to include region...");
+      mockupUrl = mockupUrl.replace(
+        "s3.amazonaws.com",
+        "s3.us-east-1.amazonaws.com"
+      );
+      console.log("Fixed URL with region:", mockupUrl);
+    }
+
     // Return all URLs to the client
     const response = {
       success: true,

@@ -131,6 +131,15 @@ async function generateMockupWithLambda(logoUrl, email, name, fileType = "") {
       return fallbackUrl;
     }
 
+    // Convert pre-signed URL to direct URL if needed
+    if (mockupUrl.includes("?")) {
+      console.log("Converting pre-signed URL to direct URL...");
+      const directUrl = mockupUrl.split("?")[0];
+      console.log("Original URL:", mockupUrl);
+      console.log("Direct URL:", directUrl);
+      mockupUrl = directUrl;
+    }
+
     // Ensure the URL includes the region
     if (
       mockupUrl.includes("s3.amazonaws.com") &&
