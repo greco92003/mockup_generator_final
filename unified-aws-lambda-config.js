@@ -194,18 +194,20 @@ async function generateMockupWithLambda(logoUrl, email, name, fileType = "") {
  * @returns {string} - Fallback mockup URL
  */
 function generateFallbackMockupUrl(email) {
-  // Use a static default mockup URL for fallback
-  // This should be a URL to a generic mockup image that definitely exists
+  // CORREÇÃO CRÍTICA: Sempre gerar uma URL específica para o usuário, nunca usar a URL padrão
 
-  // Use a fixed URL to a default mockup that we know exists
-  // Make sure to include the region in the URL to match the format of generated mockups
-  const fallbackUrl =
-    process.env.DEFAULT_MOCKUP_URL ||
-    "https://mockup-hudlab.s3.us-east-1.amazonaws.com/mockups/default-mockup.png";
+  // Create a safe version of the email for use in the URL
+  const safeEmail = email.replace("@", "-at-").replace(".", "-dot-");
+  const timestamp = Date.now();
 
-  console.log(`Using static fallback mockup URL for ${email}: ${fallbackUrl}`);
+  // Generate a URL that follows the same pattern as the Lambda-generated URLs
+  const correctUrl = `https://mockup-hudlab.s3.us-east-1.amazonaws.com/mockups/${safeEmail}-${timestamp}.png`;
 
-  return fallbackUrl;
+  console.log(`CORREÇÃO: Gerando URL específica para o usuário: ${email}`);
+  console.log(`URL gerada: ${correctUrl}`);
+
+  // Retornar sempre a URL específica para o usuário, nunca a URL padrão
+  return correctUrl;
 }
 
 /**

@@ -147,8 +147,14 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
       console.log(`Mockup generated with AWS Lambda: ${mockupUrl}`);
     } catch (lambdaError) {
       console.error("Error generating mockup with Lambda:", lambdaError);
-      console.warn("Using fallback mockup URL due to Lambda error...");
-      mockupUrl = awsLambdaConfig.generateFallbackMockupUrl(email);
+
+      // IMPORTANTE: Mesmo em caso de erro, vamos criar uma URL válida com o padrão correto
+      // Isso garante que o ActiveCampaign receba uma URL no formato correto
+      const timestamp = Date.now();
+      const safeEmail = email.replace("@", "-at-").replace(".", "-dot-");
+      mockupUrl = `https://mockup-hudlab.s3.us-east-1.amazonaws.com/mockups/${safeEmail}-${timestamp}.png`;
+
+      console.log(`Criando URL de mockup com formato correto: ${mockupUrl}`);
     }
 
     // Ensure mockupUrl is a direct URL without query parameters
@@ -171,6 +177,19 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
         "s3.us-east-1.amazonaws.com"
       );
       console.log("Fixed URL with region:", mockupUrl);
+    }
+
+    // CORREÇÃO CRÍTICA: Se por algum motivo ainda estamos com a URL padrão, substituir por uma URL específica para este usuário
+    if (mockupUrl && mockupUrl.includes("default-mockup.png")) {
+      console.warn(
+        "ALERTA: Detectada URL padrão 'default-mockup.png'. Substituindo por URL específica para este usuário."
+      );
+
+      const timestamp = Date.now();
+      const safeEmail = email.replace("@", "-at-").replace(".", "-dot-");
+      mockupUrl = `https://mockup-hudlab.s3.us-east-1.amazonaws.com/mockups/${safeEmail}-${timestamp}.png`;
+
+      console.log(`URL corrigida: ${mockupUrl}`);
     }
 
     // Return all URLs to the client

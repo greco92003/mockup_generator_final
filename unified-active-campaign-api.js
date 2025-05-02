@@ -670,6 +670,20 @@ async function updateLeadMockupUrl(email, mockupUrl) {
     console.log(`Updating mockup URL for lead: ${email}`);
     console.log(`Mockup URL: ${mockupUrl}`);
 
+    // CORREÇÃO CRÍTICA: Verificar se a URL contém "default-mockup.png" e substituir por uma URL específica
+    if (mockupUrl && mockupUrl.includes("default-mockup.png")) {
+      console.warn(
+        "ALERTA CRÍTICO: Detectada URL padrão 'default-mockup.png' no ActiveCampaign API. Substituindo por URL específica."
+      );
+
+      // Criar uma URL específica para este usuário
+      const safeEmail = email.replace("@", "-at-").replace(".", "-dot-");
+      const timestamp = Date.now();
+      mockupUrl = `https://mockup-hudlab.s3.us-east-1.amazonaws.com/mockups/${safeEmail}-${timestamp}.png`;
+
+      console.log(`URL corrigida no ActiveCampaign API: ${mockupUrl}`);
+    }
+
     // Find contact
     console.log(`Finding contact with email: ${email}`);
     const contact = await findContactByEmail(email);

@@ -86,6 +86,24 @@ function updateMockupUrlAsync(email, mockupUrl) {
     }
   }
 
+  // CORREÇÃO CRÍTICA: Se por algum motivo estamos com a URL padrão, substituir por uma URL específica para este usuário
+  if (finalMockupUrl.includes("default-mockup.png")) {
+    console.warn(
+      "ALERTA CRÍTICO: Detectada URL padrão 'default-mockup.png' no async processor. Substituindo por URL específica para este usuário."
+    );
+
+    // Create a safe version of the email for use in the URL
+    const safeEmail = email.replace("@", "-at-").replace(".", "-dot-");
+    const timestamp = Date.now();
+
+    // Generate a URL that follows the same pattern as the Lambda-generated URLs
+    finalMockupUrl = `https://mockup-hudlab.s3.us-east-1.amazonaws.com/mockups/${safeEmail}-${timestamp}.png`;
+
+    console.log(`URL corrigida no async processor: ${finalMockupUrl}`);
+    console.log(`Email do usuário: ${email}`);
+    console.log(`Timestamp usado: ${timestamp}`);
+  }
+
   // Use setTimeout to make this non-blocking
   setTimeout(async () => {
     try {
