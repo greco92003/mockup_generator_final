@@ -1,6 +1,6 @@
 /**
  * Unified ActiveCampaign API Module
- * 
+ *
  * This module provides functions for interacting with the ActiveCampaign API.
  */
 
@@ -153,7 +153,7 @@ async function updateContact(contactData) {
 async function createOrUpdateCustomField(fieldLabel, fieldType = "TEXT") {
   try {
     console.log(`Creating or updating custom field: ${fieldLabel}`);
-    
+
     // First check if field exists
     const response = await fetch(`${AC_API_URL}/api/3/fields?limit=100`, {
       method: "GET",
@@ -300,9 +300,7 @@ async function updateContactCustomField(contactId, fieldId, fieldValue) {
 
     // If the update failed, try a direct approach
     if (!data2.fieldValue) {
-      console.warn(
-        "Failed to update field. Trying alternative approach..."
-      );
+      console.warn("Failed to update field. Trying alternative approach...");
 
       // Try a direct approach using the contacts endpoint
       const directResponse = await fetch(
@@ -330,9 +328,7 @@ async function updateContactCustomField(contactId, fieldId, fieldValue) {
       const directData = await directResponse.json();
 
       if (directData.contact) {
-        console.log(
-          "Field updated successfully using alternative approach"
-        );
+        console.log("Field updated successfully using alternative approach");
         return { field: fieldId, value: fieldValue };
       }
     }
@@ -531,11 +527,11 @@ async function processLeadWithMockup(leadData, mockupUrl) {
     console.log(`Processing lead with mockup URL: ${leadData.email}`);
 
     const { email, name, phone, segmento } = leadData;
-    
+
     // Split name into first and last name
     let firstName = name;
     let lastName = "";
-    
+
     if (name && name.includes(" ")) {
       const nameParts = name.split(" ");
       firstName = nameParts[0];
@@ -544,7 +540,7 @@ async function processLeadWithMockup(leadData, mockupUrl) {
 
     // Find or create contact
     let contact = await findContactByEmail(email);
-    
+
     if (!contact) {
       // Create new contact
       contact = await createContact({
@@ -574,22 +570,14 @@ async function processLeadWithMockup(leadData, mockupUrl) {
       );
 
       // Update custom field with segmento value
-      await updateContactCustomField(
-        contact.id,
-        segmentoField.id,
-        segmento
-      );
+      await updateContactCustomField(contact.id, segmentoField.id, segmento);
     }
 
     // Find or create mockup_url custom field
     const mockupField = await createOrUpdateCustomField("mockup_url", "TEXT");
 
     // Update custom field with mockup URL
-    await updateContactCustomField(
-      contact.id,
-      mockupField.id,
-      mockupUrl
-    );
+    await updateContactCustomField(contact.id, mockupField.id, mockupUrl);
 
     // Add contact to default list
     const defaultList = await findOrCreateList("Mockup Generator");
@@ -613,11 +601,11 @@ async function processLeadBasicInfo(leadData) {
     console.log(`Processing basic lead information: ${leadData.email}`);
 
     const { email, name, phone, segmento } = leadData;
-    
+
     // Split name into first and last name
     let firstName = name;
     let lastName = "";
-    
+
     if (name && name.includes(" ")) {
       const nameParts = name.split(" ");
       firstName = nameParts[0];
@@ -626,7 +614,7 @@ async function processLeadBasicInfo(leadData) {
 
     // Find or create contact
     let contact = await findContactByEmail(email);
-    
+
     if (!contact) {
       // Create new contact
       contact = await createContact({
@@ -656,11 +644,7 @@ async function processLeadBasicInfo(leadData) {
       );
 
       // Update custom field with segmento value
-      await updateContactCustomField(
-        contact.id,
-        segmentoField.id,
-        segmento
-      );
+      await updateContactCustomField(contact.id, segmentoField.id, segmento);
     }
 
     // Add contact to default list
@@ -687,17 +671,25 @@ async function updateLeadMockupUrl(email, mockupUrl) {
     console.log(`Mockup URL: ${mockupUrl}`);
 
     // Find contact
+    console.log(`Finding contact with email: ${email}`);
     const contact = await findContactByEmail(email);
-    
+
     if (!contact) {
-      console.log(`Contact with email ${email} not found`);
+      console.log(`Contact with email ${email} not found in ActiveCampaign`);
       return null;
     }
 
+    console.log(`Contact found in ActiveCampaign with ID: ${contact.id}`);
+
     // Find or create mockup_url custom field
+    console.log(`Finding or creating mockup_url custom field`);
     const mockupField = await createOrUpdateCustomField("mockup_url", "TEXT");
+    console.log(`mockup_url field ID: ${mockupField.id}`);
 
     // Update custom field with mockup URL
+    console.log(
+      `Updating contact ${contact.id} field ${mockupField.id} with value: ${mockupUrl}`
+    );
     const result = await updateContactCustomField(
       contact.id,
       mockupField.id,
@@ -705,9 +697,12 @@ async function updateLeadMockupUrl(email, mockupUrl) {
     );
 
     console.log(`Mockup URL updated successfully for lead: ${email}`);
+    console.log(`Update result:`, JSON.stringify(result));
     return result;
   } catch (error) {
     console.error("Error updating lead mockup URL:", error);
+    console.error("Error details:", error.message);
+    console.error("Stack trace:", error.stack);
     throw error;
   }
 }
@@ -724,17 +719,28 @@ async function updateLeadLogoUrl(email, logoUrl) {
     console.log(`Logo URL: ${logoUrl}`);
 
     // Find contact
+    console.log(`Finding contact with email: ${email}`);
     const contact = await findContactByEmail(email);
-    
+
     if (!contact) {
-      console.log(`Contact with email ${email} not found`);
+      console.log(`Contact with email ${email} not found in ActiveCampaign`);
       return null;
     }
 
+    console.log(`Contact found in ActiveCampaign with ID: ${contact.id}`);
+
     // Find or create mockup_logotipo custom field
-    const logoField = await createOrUpdateCustomField("mockup_logotipo", "TEXT");
+    console.log(`Finding or creating mockup_logotipo custom field`);
+    const logoField = await createOrUpdateCustomField(
+      "mockup_logotipo",
+      "TEXT"
+    );
+    console.log(`mockup_logotipo field ID: ${logoField.id}`);
 
     // Update custom field with logo URL
+    console.log(
+      `Updating contact ${contact.id} field ${logoField.id} with value: ${logoUrl}`
+    );
     const result = await updateContactCustomField(
       contact.id,
       logoField.id,
@@ -742,9 +748,12 @@ async function updateLeadLogoUrl(email, logoUrl) {
     );
 
     console.log(`Logo URL updated successfully for lead: ${email}`);
+    console.log(`Update result:`, JSON.stringify(result));
     return result;
   } catch (error) {
     console.error("Error updating lead logo URL:", error);
+    console.error("Error details:", error.message);
+    console.error("Stack trace:", error.stack);
     throw error;
   }
 }
@@ -763,5 +772,5 @@ module.exports = {
   processLeadWithMockup,
   processLeadBasicInfo,
   updateLeadMockupUrl,
-  updateLeadLogoUrl
+  updateLeadLogoUrl,
 };

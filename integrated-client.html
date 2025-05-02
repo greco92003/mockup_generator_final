@@ -467,13 +467,7 @@
           loadingIndicator.style.display = "block";
 
           try {
-            // Enviar o formulário para o ActiveCampaign imediatamente
-            console.log("Enviando dados para o ActiveCampaign...");
-
-            // Usar o método tradicional de envio de formulário para o ActiveCampaign
-            form.submit();
-
-            // Iniciar o upload do arquivo em paralelo (não esperamos pela resposta)
+            // Primeiro, enviar o arquivo para o servidor
             const formData = new FormData();
             formData.append("name", document.getElementById("fullname").value);
             formData.append("email", email);
@@ -484,31 +478,40 @@
             );
             formData.append("logo", logoFile);
 
-            // Enviar o arquivo para o servidor de forma assíncrona
-            fetch("/api/mockup", {
+            // Mostrar mensagem de processamento
+            console.log("Enviando arquivo para processamento...");
+
+            // Enviar o arquivo para o servidor e esperar pela resposta
+            const response = await fetch("/api/mockup", {
               method: "POST",
               body: formData,
-            })
-              .then((response) => {
-                if (response.ok) {
-                  console.log(
-                    "Arquivo enviado com sucesso para processamento assíncrono"
-                  );
-                } else {
-                  console.error(
-                    "Erro ao enviar arquivo para processamento assíncrono"
-                  );
-                }
-              })
-              .catch((error) => {
-                console.error(
-                  "Erro na requisição de processamento assíncrono:",
-                  error
-                );
-              });
+            });
 
-            // Não precisamos esperar pela resposta, pois o formulário já foi enviado
-            // e os campos serão atualizados de forma assíncrona no ActiveCampaign
+            if (!response.ok) {
+              throw new Error("Erro ao processar o arquivo");
+            }
+
+            const data = await response.json();
+            console.log("Resposta do servidor:", data);
+
+            // Preencher os campos ocultos com as URLs
+            if (data.url) {
+              document.getElementById("mockup_url").value = data.url;
+              console.log("Campo mockup_url preenchido com:", data.url);
+            }
+
+            if (data.originalLogoUrl) {
+              document.getElementById("mockup_logotipo").value =
+                data.originalLogoUrl;
+              console.log(
+                "Campo mockup_logotipo preenchido com:",
+                data.originalLogoUrl
+              );
+            }
+
+            // Agora enviar o formulário para o ActiveCampaign com os campos preenchidos
+            console.log("Enviando dados para o ActiveCampaign...");
+            form.submit();
           } catch (error) {
             console.error("Erro ao processar o formulário:", error);
             alert(

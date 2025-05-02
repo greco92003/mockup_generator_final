@@ -152,7 +152,7 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
     }
 
     // Return all URLs to the client
-    res.json({
+    const response = {
       success: true,
       name,
       email,
@@ -162,7 +162,13 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
       originalLogoUrl: originalLogoUrl, // URL for the original uncompressed logo in logo-uncompressed folder
       url: mockupUrl, // URL for the generated mockup
       redirect_url: WHATSAPP_REDIRECT_URL,
-    });
+    };
+
+    console.log("Sending response to client with URLs:");
+    console.log("- mockup_url (url):", mockupUrl);
+    console.log("- mockup_logotipo (originalLogoUrl):", originalLogoUrl);
+
+    res.json(response);
 
     // Process lead in ActiveCampaign asynchronously
     console.log("Processing lead in ActiveCampaign asynchronously...");
@@ -173,18 +179,25 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
       segmento,
     });
 
-    // Update mockup URLs in ActiveCampaign asynchronously
-    if (mockupUrl) {
-      console.log("Updating mockup URL in ActiveCampaign asynchronously...");
-      asyncProcessor.updateMockupUrlAsync(email, mockupUrl);
-    }
+    // Add a delay before updating URLs to ensure contact is created
+    setTimeout(() => {
+      // Update mockup URLs in ActiveCampaign asynchronously
+      if (mockupUrl) {
+        console.log(
+          "Updating mockup URL in ActiveCampaign asynchronously (with delay)..."
+        );
+        asyncProcessor.updateMockupUrlAsync(email, mockupUrl);
+      }
 
-    // Update logo URL in ActiveCampaign asynchronously
-    // Use originalLogoUrl (from logo-uncompressed or logo-pdf) for the mockup_logotipo field
-    if (originalLogoUrl) {
-      console.log("Updating logo URL in ActiveCampaign asynchronously...");
-      asyncProcessor.updateLogoUrlAsync(email, originalLogoUrl);
-    }
+      // Update logo URL in ActiveCampaign asynchronously
+      // Use originalLogoUrl (from logo-uncompressed or logo-pdf) for the mockup_logotipo field
+      if (originalLogoUrl) {
+        console.log(
+          "Updating logo URL in ActiveCampaign asynchronously (with delay)..."
+        );
+        asyncProcessor.updateLogoUrlAsync(email, originalLogoUrl);
+      }
+    }, 3000); // 3 second delay to ensure contact is created first
 
     // Clean up temporary files
     setTimeout(() => {
