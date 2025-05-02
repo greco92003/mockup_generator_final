@@ -479,72 +479,80 @@
           loadingIndicator.style.display = "block";
 
           try {
-            // Preparar os dados do formulário
-            const formData = new FormData();
+            // Preparar os dados básicos do usuário
             const fullname = document.getElementById("fullname").value;
             const phone = document.getElementById("phone").value;
             const segmento = document.getElementById("field[7]").value;
 
-            formData.append("name", fullname);
-            formData.append("email", email);
-            formData.append("phone", phone);
-            formData.append("segmento", segmento);
-            formData.append("logo", logoFile);
-
-            // Iniciar o upload do arquivo em paralelo com a preparação do formulário
-            console.log("Iniciando upload do arquivo...");
-
-            // Usar AbortController para poder cancelar a requisição se necessário
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundos de timeout
-
-            const response = await fetch("/api/mockup", {
+            // Primeiro, enviar apenas os dados básicos do usuário para processamento imediato
+            console.log("Enviando dados básicos do usuário...");
+            const userDataResponse = await fetch("/api/user-data", {
               method: "POST",
-              body: formData,
-              signal: controller.signal,
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                name: fullname,
+                email: email,
+                phone: phone,
+                segmento: segmento,
+              }),
             });
 
-            clearTimeout(timeoutId);
-
-            if (!response.ok) {
+            if (!userDataResponse.ok) {
               throw new Error(
-                `Erro ao processar o arquivo: ${response.status} ${response.statusText}`
+                `Erro ao processar dados do usuário: ${userDataResponse.status} ${userDataResponse.statusText}`
               );
             }
 
-            const data = await response.json();
-            console.log("Resposta do servidor:", data);
+            const userData = await userDataResponse.json();
+            console.log("Resposta do servidor (dados do usuário):", userData);
 
-            // Preencher os campos ocultos com as URLs
-            if (data.url) {
-              document.getElementById("mockup_url").value = data.url;
-              console.log("Campo mockup_url preenchido com:", data.url);
-            }
+            // Capturar a URL de redirecionamento dos dados do usuário
+            const redirectUrl = userData.redirect_url;
 
-            if (data.originalLogoUrl) {
-              document.getElementById("mockup_logotipo").value =
-                data.originalLogoUrl;
-              console.log(
-                "Campo mockup_logotipo preenchido com:",
-                data.originalLogoUrl
-              );
-            }
+            // Em paralelo, iniciar o upload do logo
+            console.log("Iniciando upload do logo em segundo plano...");
+            const logoFormData = new FormData();
+            logoFormData.append("name", fullname);
+            logoFormData.append("email", email);
+            logoFormData.append("phone", phone);
+            logoFormData.append("segmento", segmento);
+            logoFormData.append("logo", logoFile);
 
-            // Verificar se temos uma URL de redirecionamento
-            const redirectUrl = data.redirect_url;
+            // Iniciar o upload do logo em segundo plano (não aguardar resposta)
+            fetch("/api/mockup", {
+              method: "POST",
+              body: logoFormData,
+            })
+              .then((response) => {
+                if (!response.ok) {
+                  console.error(
+                    "Erro no upload do logo:",
+                    response.status,
+                    response.statusText
+                  );
+                }
+                return response.json();
+              })
+              .then((data) => {
+                console.log(
+                  "Logo processado com sucesso em segundo plano:",
+                  data
+                );
+              })
+              .catch((error) => {
+                console.error(
+                  "Erro ao processar o logo em segundo plano:",
+                  error
+                );
+              });
 
-            // Modificar o comportamento do formulário para usar AJAX em vez de submit tradicional
-            // Isso permite que possamos controlar o redirecionamento após o envio
-            const acFormData = new FormData(form);
-
-            // Enviar o formulário para o ActiveCampaign via AJAX
-            console.log("Enviando dados para o ActiveCampaign via AJAX...");
-
-            // Submeter o formulário normalmente (isso é mais confiável com o ActiveCampaign)
+            // Submeter o formulário para o ActiveCampaign imediatamente
+            console.log("Enviando formulário para o ActiveCampaign...");
             form.submit();
 
-            // Após um pequeno delay para garantir que o formulário foi enviado,
-            // redirecionar a página pai para a URL de redirecionamento
+            // Redirecionar a página pai para a URL de redirecionamento
             if (redirectUrl) {
               console.log("Redirecionando para:", redirectUrl);
               setTimeout(() => {
