@@ -122,12 +122,50 @@ function updateMockupUrlAsync(email, mockupUrl) {
       console.log(
         `Final mockup URL being sent to ActiveCampaign: ${finalMockupUrl}`
       );
-      const result = await activeCampaign.updateLeadMockupUrl(
-        email,
-        finalMockupUrl
-      );
-      console.log(`Mockup URL updated successfully (async): ${email}`);
-      console.log(`Update result:`, JSON.stringify(result));
+
+      // Make multiple attempts to update the mockup URL in case of failure
+      let success = false;
+      let attempts = 0;
+      const maxAttempts = 3;
+
+      while (!success && attempts < maxAttempts) {
+        attempts++;
+        console.log(
+          `Attempt ${attempts} to update mockup URL in ActiveCampaign...`
+        );
+
+        try {
+          const result = await activeCampaign.updateLeadMockupUrl(
+            email,
+            finalMockupUrl
+          );
+
+          if (result) {
+            console.log(
+              `Mockup URL updated successfully (async) on attempt ${attempts}: ${email}`
+            );
+            console.log(`Update result:`, JSON.stringify(result));
+            success = true;
+          } else {
+            console.warn(
+              `Update attempt ${attempts} returned no result, will retry...`
+            );
+            await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1 second before retrying
+          }
+        } catch (attemptError) {
+          console.error(
+            `Error on update attempt ${attempts}:`,
+            attemptError.message
+          );
+          await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1 second before retrying
+        }
+      }
+
+      if (!success) {
+        console.error(
+          `Failed to update mockup URL after ${maxAttempts} attempts`
+        );
+      }
     } catch (error) {
       console.error("Error updating mockup URL (async):", error);
       console.error("Error details:", error.message);

@@ -695,24 +695,151 @@ async function updateLeadMockupUrl(email, mockupUrl) {
 
     console.log(`Contact found in ActiveCampaign with ID: ${contact.id}`);
 
-    // Find or create mockup_url custom field
-    console.log(`Finding or creating mockup_url custom field`);
-    const mockupField = await createOrUpdateCustomField("mockup_url", "TEXT");
-    console.log(`mockup_url field ID: ${mockupField.id}`);
+    // Try multiple approaches to update the mockup_url field
+    let result = null;
+    let success = false;
 
-    // Update custom field with mockup URL
-    console.log(
-      `Updating contact ${contact.id} field ${mockupField.id} with value: ${mockupUrl}`
-    );
-    const result = await updateContactCustomField(
-      contact.id,
-      mockupField.id,
-      mockupUrl
-    );
+    // Approach 1: Use the updateContactCustomField function
+    try {
+      console.log("Approach 1: Using updateContactCustomField function");
 
-    console.log(`Mockup URL updated successfully for lead: ${email}`);
-    console.log(`Update result:`, JSON.stringify(result));
-    return result;
+      // Find or create mockup_url custom field
+      console.log(`Finding or creating mockup_url custom field`);
+      const mockupField = await createOrUpdateCustomField("mockup_url", "TEXT");
+      console.log(`mockup_url field ID: ${mockupField.id}`);
+
+      // Update custom field with mockup URL
+      console.log(
+        `Updating contact ${contact.id} field ${mockupField.id} with value: ${mockupUrl}`
+      );
+      result = await updateContactCustomField(
+        contact.id,
+        mockupField.id,
+        mockupUrl
+      );
+
+      if (result) {
+        console.log("Approach 1 successful");
+        success = true;
+      } else {
+        console.warn("Approach 1 failed, trying approach 2");
+      }
+    } catch (error1) {
+      console.error("Error in approach 1:", error1.message);
+    }
+
+    // Approach 2: Use direct API call with hardcoded field ID
+    if (!success) {
+      try {
+        console.log(
+          "Approach 2: Using direct API call with hardcoded field ID 41"
+        );
+
+        // Make a direct API call to update the field
+        const response = await fetch(`${AC_API_URL}/api/3/fieldValues`, {
+          method: "POST",
+          headers: {
+            "Api-Token": AC_API_KEY,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({
+            fieldValue: {
+              contact: contact.id,
+              field: 41, // Hardcoded ID for mockup_url
+              value: mockupUrl,
+            },
+          }),
+        });
+
+        const data = await response.json();
+
+        if (data.fieldValue) {
+          console.log("Approach 2 successful");
+          console.log("Field value updated:", data.fieldValue);
+          result = data.fieldValue;
+          success = true;
+        } else {
+          console.warn("Approach 2 failed, trying approach 3");
+        }
+      } catch (error2) {
+        console.error("Error in approach 2:", error2.message);
+      }
+    }
+
+    // Approach 3: Use the contacts endpoint with fieldValues
+    if (!success) {
+      try {
+        console.log("Approach 3: Using contacts endpoint with fieldValues");
+
+        // Try a direct approach using the contacts endpoint
+        const directResponse = await fetch(
+          `${AC_API_URL}/api/3/contacts/${contact.id}`,
+          {
+            method: "PUT",
+            headers: {
+              "Api-Token": AC_API_KEY,
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+            body: JSON.stringify({
+              contact: {
+                fieldValues: [
+                  {
+                    field: 41, // Hardcoded ID for mockup_url
+                    value: mockupUrl,
+                  },
+                ],
+              },
+            }),
+          }
+        );
+
+        const directData = await directResponse.json();
+
+        if (directData.contact) {
+          console.log("Approach 3 successful");
+          result = { field: 41, value: mockupUrl };
+          success = true;
+        } else {
+          console.warn("Approach 3 failed");
+        }
+      } catch (error3) {
+        console.error("Error in approach 3:", error3.message);
+      }
+    }
+
+    if (success) {
+      console.log(`Mockup URL updated successfully for lead: ${email}`);
+      console.log(`Update result:`, JSON.stringify(result));
+
+      // Verify the update
+      try {
+        console.log("Verifying the update...");
+        const fieldValues = await getContactFieldValues(contact.id);
+        const mockupUrlField = fieldValues.find(
+          (field) => parseInt(field.field) === 41
+        );
+
+        if (mockupUrlField) {
+          console.log(
+            "Verification successful. Current mockup_url value:",
+            mockupUrlField.value
+          );
+        } else {
+          console.warn(
+            "Verification failed. Could not find mockup_url field in contact's field values."
+          );
+        }
+      } catch (verifyError) {
+        console.error("Error verifying update:", verifyError.message);
+      }
+
+      return result;
+    } else {
+      console.error("All approaches failed to update mockup_url field");
+      return null;
+    }
   } catch (error) {
     console.error("Error updating lead mockup URL:", error);
     console.error("Error details:", error.message);
