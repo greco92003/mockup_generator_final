@@ -118,7 +118,29 @@ async function generateMockupWithLambda(logoUrl, email, name, fileType = "") {
     }
 
     // Extract mockup URL from response
-    const mockupUrl = response.data.mockupUrl || response.data.url;
+    let mockupUrl = response.data.mockupUrl || response.data.url;
+
+    // Check if the response contains a body field (API Gateway format)
+    if (!mockupUrl && response.data.body) {
+      try {
+        // Try to parse the body if it's a string
+        const bodyContent =
+          typeof response.data.body === "string"
+            ? JSON.parse(response.data.body)
+            : response.data.body;
+
+        // If there's a mockupUrl in the body, use it
+        if (bodyContent.mockupUrl) {
+          console.log(
+            "Found mockupUrl in response body:",
+            bodyContent.mockupUrl
+          );
+          mockupUrl = bodyContent.mockupUrl;
+        }
+      } catch (parseError) {
+        console.error("Error parsing Lambda response body:", parseError);
+      }
+    }
 
     if (!mockupUrl) {
       console.warn("No mockup URL found in Lambda response");
@@ -198,7 +220,8 @@ function generateFallbackMockupUrl(email) {
 
   // Create a safe version of the email for use in the URL
   const safeEmail = email.replace("@", "-at-").replace(".", "-dot-");
-  const timestamp = Date.now();
+  // Use Math.floor(Date.now() / 1000) to get seconds instead of milliseconds to match Lambda's format
+  const timestamp = Math.floor(Date.now() / 1000);
 
   // Generate a URL that follows the same pattern as the Lambda-generated URLs
   const correctUrl = `https://mockup-hudlab.s3.us-east-1.amazonaws.com/mockups/${safeEmail}-${timestamp}.png`;

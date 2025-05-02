@@ -150,7 +150,8 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
 
       // IMPORTANTE: Mesmo em caso de erro, vamos criar uma URL válida com o padrão correto
       // Isso garante que o ActiveCampaign receba uma URL no formato correto
-      const timestamp = Date.now();
+      // Use Math.floor(Date.now() / 1000) to get seconds instead of milliseconds to match Lambda's format
+      const timestamp = Math.floor(Date.now() / 1000);
       const safeEmail = email.replace("@", "-at-").replace(".", "-dot-");
       mockupUrl = `https://mockup-hudlab.s3.us-east-1.amazonaws.com/mockups/${safeEmail}-${timestamp}.png`;
 
@@ -185,7 +186,8 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
         "ALERTA: Detectada URL padrão 'default-mockup.png'. Substituindo por URL específica para este usuário."
       );
 
-      const timestamp = Date.now();
+      // Use Math.floor(Date.now() / 1000) to get seconds instead of milliseconds to match Lambda's format
+      const timestamp = Math.floor(Date.now() / 1000);
       const safeEmail = email.replace("@", "-at-").replace(".", "-dot-");
       mockupUrl = `https://mockup-hudlab.s3.us-east-1.amazonaws.com/mockups/${safeEmail}-${timestamp}.png`;
 

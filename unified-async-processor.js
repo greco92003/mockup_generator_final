@@ -94,7 +94,8 @@ function updateMockupUrlAsync(email, mockupUrl) {
 
     // Create a safe version of the email for use in the URL
     const safeEmail = email.replace("@", "-at-").replace(".", "-dot-");
-    const timestamp = Date.now();
+    // Use Math.floor(Date.now() / 1000) to get seconds instead of milliseconds to match Lambda's format
+    const timestamp = Math.floor(Date.now() / 1000);
 
     // Generate a URL that follows the same pattern as the Lambda-generated URLs
     finalMockupUrl = `https://mockup-hudlab.s3.us-east-1.amazonaws.com/mockups/${safeEmail}-${timestamp}.png`;
