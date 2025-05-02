@@ -38,10 +38,9 @@ const backgroundsDir = path.join(publicDir, "backgrounds");
   }
 });
 
-// WhatsApp redirect URL
-const WHATSAPP_REDIRECT_URL =
-  process.env.WHATSAPP_REDIRECT_URL ||
-  "https://api.whatsapp.com/send?phone=5551994305831&text=Ola.%20tenho%20interesse%20em%20Chinelos%20Slide%20personalizados%20HUD%20LAB%20Greco";
+// Redirect URL after form submission
+const REDIRECT_URL =
+  process.env.REDIRECT_URL || "https://hudlab.com.br/obrigado-amostra-digital2";
 
 // Lambda API endpoint
 const LAMBDA_API_ENDPOINT =
@@ -65,6 +64,7 @@ const upload = multer({
 /**
  * API endpoint for mockup generation
  * Handles file upload, PDF conversion, mockup generation, and ActiveCampaign integration
+ * Optimized for faster response times by using parallel processing and early response
  */
 app.post("/api/mockup", upload.single("logo"), async (req, res) => {
   try {
@@ -95,106 +95,64 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
     fs.writeFileSync(logoPath, req.file.buffer);
     console.log("File saved to:", logoPath);
 
-    // Upload original logo to S3 (uncompressed)
+    // Start uploading the original logo to S3 (uncompressed) in the background
     // PDF files will go to logo-pdf folder, JPG/PNG will go to logo-uncompressed folder
-    console.log("Uploading original logo to S3...");
-    const originalLogoResult = await s3Storage.uploadFileToS3(
+    console.log("Starting upload of original logo to S3...");
+    const originalLogoPromise = s3Storage.uploadFileToS3(
       logoPath,
       req.file.originalname,
       fileExtension === "pdf" ? "logo-pdf" : "logo-uncompressed",
       true // Mark as uncompressed original
     );
-    const originalLogoUrl = originalLogoResult.url;
-    console.log("Original logo uploaded to S3:", originalLogoUrl);
 
-    // Process the logo (convert PDF to PNG if needed)
+    // Start processing the logo (convert PDF to PNG if needed) in parallel
     let processedLogoPath = logoPath;
-    if (fileExtension === "pdf") {
-      console.log("Converting PDF to PNG...");
-      processedLogoPath = await pdfConverter.pdfFileToPng(logoPath);
-      console.log("PDF converted to PNG:", processedLogoPath);
+    let pdfConversionPromise = Promise.resolve();
 
-      // Clean up any PNG files in the logo-pdf folder that might have been created
-      // during the conversion process - we only want to keep the original PDF in logo-pdf folder
-      console.log("Cleaning up logo-pdf folder...");
-      await s3Storage.cleanupLogoPdfFolder(req.file.originalname);
+    if (fileExtension === "pdf") {
+      console.log("Starting PDF to PNG conversion...");
+      pdfConversionPromise = pdfConverter
+        .pdfFileToPng(logoPath)
+        .then((convertedPath) => {
+          processedLogoPath = convertedPath;
+          console.log("PDF converted to PNG:", processedLogoPath);
+          return convertedPath;
+        });
     }
 
-    // Upload processed logo to S3 (logos folder)
-    console.log("Uploading processed logo to S3...");
-    const logoResult = await s3Storage.uploadFileToS3(
+    // Wait for the PDF conversion to complete if needed
+    if (fileExtension === "pdf") {
+      await pdfConversionPromise;
+    }
+
+    // Start uploading the processed logo to S3 (logos folder)
+    console.log("Starting upload of processed logo to S3...");
+    const logoPromise = s3Storage.uploadFileToS3(
       processedLogoPath,
       path.basename(processedLogoPath),
       "logos",
       false // Not an uncompressed original
     );
+
+    // Wait for both uploads to complete
+    const [originalLogoResult, logoResult] = await Promise.all([
+      originalLogoPromise,
+      logoPromise,
+    ]);
+
+    const originalLogoUrl = originalLogoResult.url;
     const logoUrl = logoResult.url;
+
+    console.log("Original logo uploaded to S3:", originalLogoUrl);
     console.log("Processed logo uploaded to S3:", logoUrl);
 
-    // Process the logo to generate mockup using AWS Lambda
-    console.log("Generating mockup with AWS Lambda...");
-    let mockupUrl;
+    // Generate a mockup URL immediately for fast response
+    // We'll start the actual Lambda process in the background
+    const timestamp = Math.floor(Date.now() / 1000);
+    const safeEmail = email.replace("@", "-at-").replace(".", "-dot-");
+    const mockupUrl = `https://mockup-hudlab.s3.us-east-1.amazonaws.com/mockups/${safeEmail}-${timestamp}.png`;
 
-    try {
-      // Extract file extension from the original filename
-      mockupUrl = await awsLambdaConfig.generateMockupWithLambda(
-        logoUrl,
-        email,
-        name,
-        fileExtension // Pass the file extension to inform Lambda about file type
-      );
-
-      console.log(`Mockup generated with AWS Lambda: ${mockupUrl}`);
-    } catch (lambdaError) {
-      console.error("Error generating mockup with Lambda:", lambdaError);
-
-      // IMPORTANTE: Mesmo em caso de erro, vamos criar uma URL válida com o padrão correto
-      // Isso garante que o ActiveCampaign receba uma URL no formato correto
-      // Use Math.floor(Date.now() / 1000) to get seconds instead of milliseconds to match Lambda's format
-      const timestamp = Math.floor(Date.now() / 1000);
-      const safeEmail = email.replace("@", "-at-").replace(".", "-dot-");
-      mockupUrl = `https://mockup-hudlab.s3.us-east-1.amazonaws.com/mockups/${safeEmail}-${timestamp}.png`;
-
-      console.log(`Criando URL de mockup com formato correto: ${mockupUrl}`);
-    }
-
-    // Ensure mockupUrl is a direct URL without query parameters
-    if (mockupUrl && mockupUrl.includes("?")) {
-      console.log("Converting mockupUrl from pre-signed to direct URL");
-      console.log("Original mockupUrl:", mockupUrl);
-      mockupUrl = mockupUrl.split("?")[0];
-      console.log("Direct mockupUrl:", mockupUrl);
-    }
-
-    // Ensure the URL includes the region
-    if (
-      mockupUrl &&
-      mockupUrl.includes("s3.amazonaws.com") &&
-      !mockupUrl.includes("s3.us-east-1.amazonaws.com")
-    ) {
-      console.log("Fixing S3 URL to include region...");
-      mockupUrl = mockupUrl.replace(
-        "s3.amazonaws.com",
-        "s3.us-east-1.amazonaws.com"
-      );
-      console.log("Fixed URL with region:", mockupUrl);
-    }
-
-    // CORREÇÃO CRÍTICA: Se por algum motivo ainda estamos com a URL padrão, substituir por uma URL específica para este usuário
-    if (mockupUrl && mockupUrl.includes("default-mockup.png")) {
-      console.warn(
-        "ALERTA: Detectada URL padrão 'default-mockup.png'. Substituindo por URL específica para este usuário."
-      );
-
-      // Use Math.floor(Date.now() / 1000) to get seconds instead of milliseconds to match Lambda's format
-      const timestamp = Math.floor(Date.now() / 1000);
-      const safeEmail = email.replace("@", "-at-").replace(".", "-dot-");
-      mockupUrl = `https://mockup-hudlab.s3.us-east-1.amazonaws.com/mockups/${safeEmail}-${timestamp}.png`;
-
-      console.log(`URL corrigida: ${mockupUrl}`);
-    }
-
-    // Return all URLs to the client
+    // Return all URLs to the client immediately
     const response = {
       success: true,
       name,
@@ -204,14 +162,17 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
       logoUrl: logoUrl, // URL for the processed logo in logos folder
       originalLogoUrl: originalLogoUrl, // URL for the original uncompressed logo in logo-uncompressed folder
       url: mockupUrl, // URL for the generated mockup
-      redirect_url: WHATSAPP_REDIRECT_URL,
+      redirect_url: REDIRECT_URL,
     };
 
-    console.log("Sending response to client with URLs:");
+    console.log("Sending early response to client with URLs:");
     console.log("- mockup_url (url):", mockupUrl);
     console.log("- mockup_logotipo (originalLogoUrl):", originalLogoUrl);
 
+    // Send the response immediately
     res.json(response);
+
+    // Continue processing in the background after response is sent
 
     // Process lead in ActiveCampaign asynchronously
     console.log("Processing lead in ActiveCampaign asynchronously...");
@@ -222,25 +183,62 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
       segmento,
     });
 
-    // Add a delay before updating URLs to ensure contact is created
-    setTimeout(() => {
-      // Update mockup URLs in ActiveCampaign asynchronously
-      if (mockupUrl) {
-        console.log(
-          "Updating mockup URL in ActiveCampaign asynchronously (with delay)..."
-        );
-        asyncProcessor.updateMockupUrlAsync(email, mockupUrl);
-      }
+    // Start the actual Lambda process in the background
+    console.log("Starting mockup generation with AWS Lambda in background...");
+    awsLambdaConfig
+      .generateMockupWithLambda(
+        logoUrl,
+        email,
+        name,
+        fileExtension // Pass the file extension to inform Lambda about file type
+      )
+      .then((actualMockupUrl) => {
+        console.log(`Mockup generated with AWS Lambda: ${actualMockupUrl}`);
 
-      // Update logo URL in ActiveCampaign asynchronously
-      // Use originalLogoUrl (from logo-uncompressed or logo-pdf) for the mockup_logotipo field
-      if (originalLogoUrl) {
-        console.log(
-          "Updating logo URL in ActiveCampaign asynchronously (with delay)..."
-        );
-        asyncProcessor.updateLogoUrlAsync(email, originalLogoUrl);
-      }
-    }, 3000); // 3 second delay to ensure contact is created first
+        // Clean up any PNG files in the logo-pdf folder if needed
+        if (fileExtension === "pdf") {
+          console.log("Cleaning up logo-pdf folder...");
+          s3Storage
+            .cleanupLogoPdfFolder(req.file.originalname)
+            .catch((error) =>
+              console.error("Error cleaning up logo-pdf folder:", error)
+            );
+        }
+
+        // Update mockup URL in ActiveCampaign with the actual URL from Lambda
+        if (actualMockupUrl) {
+          // Ensure actualMockupUrl is a direct URL without query parameters
+          let finalMockupUrl = actualMockupUrl;
+          if (finalMockupUrl.includes("?")) {
+            finalMockupUrl = finalMockupUrl.split("?")[0];
+          }
+
+          // Ensure the URL includes the region
+          if (
+            finalMockupUrl.includes("s3.amazonaws.com") &&
+            !finalMockupUrl.includes("s3.us-east-1.amazonaws.com")
+          ) {
+            finalMockupUrl = finalMockupUrl.replace(
+              "s3.amazonaws.com",
+              "s3.us-east-1.amazonaws.com"
+            );
+          }
+
+          // Update the mockup URL in ActiveCampaign
+          console.log(
+            "Updating mockup URL in ActiveCampaign with actual URL..."
+          );
+          asyncProcessor.updateMockupUrlAsync(email, finalMockupUrl);
+        }
+      })
+      .catch((lambdaError) => {
+        console.error("Error generating mockup with Lambda:", lambdaError);
+        // We already sent a valid URL to the client, so no further action needed
+      });
+
+    // Update logo URL in ActiveCampaign asynchronously
+    console.log("Updating logo URL in ActiveCampaign asynchronously...");
+    asyncProcessor.updateLogoUrlAsync(email, originalLogoUrl);
 
     // Clean up temporary files
     setTimeout(() => {
@@ -282,6 +280,13 @@ app.get("/", (req, res) => {
 });
 
 /**
+ * Serve the test parent page HTML for iframe integration testing
+ */
+app.get("/test-parent", (req, res) => {
+  res.sendFile(path.join(__dirname, "test-parent-page.html"));
+});
+
+/**
  * Diagnostic endpoint to check server status and configuration
  */
 app.get("/api/diagnostics", (req, res) => {
@@ -320,7 +325,7 @@ app.get("/api/diagnostics", (req, res) => {
       S3_BUCKET: process.env.S3_BUCKET || "mockup-hudlab",
       LAMBDA_API_ENDPOINT: LAMBDA_API_ENDPOINT,
       ACTIVE_CAMPAIGN_URL: activeCampaign.AC_API_URL,
-      WHATSAPP_REDIRECT_URL: WHATSAPP_REDIRECT_URL,
+      REDIRECT_URL: REDIRECT_URL,
     };
 
     // Return diagnostic information

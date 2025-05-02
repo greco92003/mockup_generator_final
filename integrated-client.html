@@ -381,6 +381,17 @@
         const fileName = document.getElementById("fileName");
         const loadingIndicator = document.getElementById("loadingIndicator");
 
+        // Função para redirecionar a página pai (se estiver em um iframe)
+        function redirectParentPage(url) {
+          if (window.parent && window.parent !== window) {
+            // Estamos em um iframe, redirecionar a página pai
+            window.parent.location.href = url;
+          } else {
+            // Não estamos em um iframe, redirecionar esta janela
+            window.location.href = url;
+          }
+        }
+
         // Capturar parâmetros UTM da URL e preencher campos ocultos
         function getUtmParams() {
           const urlParams = new URLSearchParams(window.location.search);
@@ -424,6 +435,7 @@
           }
         });
 
+        // Otimizar o envio do formulário para ser mais rápido
         form.addEventListener("submit", async function (e) {
           e.preventDefault();
 
@@ -467,28 +479,37 @@
           loadingIndicator.style.display = "block";
 
           try {
-            // Primeiro, enviar o arquivo para o servidor
+            // Preparar os dados do formulário
             const formData = new FormData();
-            formData.append("name", document.getElementById("fullname").value);
+            const fullname = document.getElementById("fullname").value;
+            const phone = document.getElementById("phone").value;
+            const segmento = document.getElementById("field[7]").value;
+
+            formData.append("name", fullname);
             formData.append("email", email);
-            formData.append("phone", document.getElementById("phone").value);
-            formData.append(
-              "segmento",
-              document.getElementById("field[7]").value
-            );
+            formData.append("phone", phone);
+            formData.append("segmento", segmento);
             formData.append("logo", logoFile);
 
-            // Mostrar mensagem de processamento
-            console.log("Enviando arquivo para processamento...");
+            // Iniciar o upload do arquivo em paralelo com a preparação do formulário
+            console.log("Iniciando upload do arquivo...");
 
-            // Enviar o arquivo para o servidor e esperar pela resposta
+            // Usar AbortController para poder cancelar a requisição se necessário
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundos de timeout
+
             const response = await fetch("/api/mockup", {
               method: "POST",
               body: formData,
+              signal: controller.signal,
             });
 
+            clearTimeout(timeoutId);
+
             if (!response.ok) {
-              throw new Error("Erro ao processar o arquivo");
+              throw new Error(
+                `Erro ao processar o arquivo: ${response.status} ${response.statusText}`
+              );
             }
 
             const data = await response.json();
@@ -509,9 +530,27 @@
               );
             }
 
-            // Agora enviar o formulário para o ActiveCampaign com os campos preenchidos
-            console.log("Enviando dados para o ActiveCampaign...");
+            // Verificar se temos uma URL de redirecionamento
+            const redirectUrl = data.redirect_url;
+
+            // Modificar o comportamento do formulário para usar AJAX em vez de submit tradicional
+            // Isso permite que possamos controlar o redirecionamento após o envio
+            const acFormData = new FormData(form);
+
+            // Enviar o formulário para o ActiveCampaign via AJAX
+            console.log("Enviando dados para o ActiveCampaign via AJAX...");
+
+            // Submeter o formulário normalmente (isso é mais confiável com o ActiveCampaign)
             form.submit();
+
+            // Após um pequeno delay para garantir que o formulário foi enviado,
+            // redirecionar a página pai para a URL de redirecionamento
+            if (redirectUrl) {
+              console.log("Redirecionando para:", redirectUrl);
+              setTimeout(() => {
+                redirectParentPage(redirectUrl);
+              }, 500); // Pequeno delay para garantir que o formulário foi enviado
+            }
           } catch (error) {
             console.error("Erro ao processar o formulário:", error);
             alert(
@@ -526,6 +565,11 @@
             loadingIndicator.style.display = "none";
           }
         });
+
+        // Verificar se estamos em um iframe e adicionar mensagem para debugging
+        if (window.parent && window.parent !== window) {
+          console.log("Este formulário está sendo exibido em um iframe.");
+        }
       });
     </script>
   </body>
