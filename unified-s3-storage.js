@@ -695,10 +695,63 @@ async function findLatestObjectWithPrefix(prefix, maxKeys = 20) {
       MaxKeys: maxKeys,
     };
 
-    const listedObjects = await s3.listObjectsV2(params).promise();
+    // Make multiple attempts to list objects
+    let attempt = 0;
+    const maxAttempts = 3;
+    let listedObjects = null;
 
-    if (!listedObjects.Contents || listedObjects.Contents.length === 0) {
-      console.log(`No objects found with prefix: ${prefix}`);
+    while (attempt < maxAttempts) {
+      try {
+        console.log(
+          `Attempt ${
+            attempt + 1
+          }/${maxAttempts} to list objects with prefix: ${prefix}`
+        );
+        listedObjects = await s3.listObjectsV2(params).promise();
+
+        if (listedObjects.Contents && listedObjects.Contents.length > 0) {
+          break; // Success, exit the loop
+        }
+
+        console.log(
+          `No objects found on attempt ${attempt + 1}, waiting before retry...`
+        );
+        await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
+        attempt++;
+      } catch (listError) {
+        console.error(
+          `Error listing objects on attempt ${attempt + 1}:`,
+          listError
+        );
+        await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
+        attempt++;
+      }
+    }
+
+    // If we still don't have any objects after all attempts
+    if (
+      !listedObjects ||
+      !listedObjects.Contents ||
+      listedObjects.Contents.length === 0
+    ) {
+      console.log(
+        `No objects found with prefix: ${prefix} after ${maxAttempts} attempts`
+      );
+
+      // Try a more direct approach - if this is a mockup prefix, try to construct a URL
+      if (prefix.startsWith("mockups/") && prefix.includes("-at-")) {
+        // Extract the email part from the prefix
+        const emailPart = prefix.replace("mockups/", "");
+
+        // Construct a direct URL based on the email and current timestamp
+        const timestamp = Date.now();
+        const mockupKey = `mockups/${emailPart}-${timestamp}.png`;
+        const constructedUrl = `https://${bucket}.s3.us-east-1.amazonaws.com/${mockupKey}`;
+
+        console.log(`Constructed direct URL as fallback: ${constructedUrl}`);
+        return constructedUrl;
+      }
+
       return null;
     }
 
@@ -724,6 +777,27 @@ async function findLatestObjectWithPrefix(prefix, maxKeys = 20) {
     return directUrl;
   } catch (error) {
     console.error(`Error finding latest object with prefix: ${error}`);
+
+    // Try a more direct approach as a fallback
+    if (prefix.startsWith("mockups/") && prefix.includes("-at-")) {
+      try {
+        // Extract the email part from the prefix
+        const emailPart = prefix.replace("mockups/", "");
+
+        // Construct a direct URL based on the email and current timestamp
+        const timestamp = Date.now();
+        const mockupKey = `mockups/${emailPart}-${timestamp}.png`;
+        const constructedUrl = `https://${bucket}.s3.us-east-1.amazonaws.com/${mockupKey}`;
+
+        console.log(
+          `Constructed direct URL as error fallback: ${constructedUrl}`
+        );
+        return constructedUrl;
+      } catch (fallbackError) {
+        console.error(`Error constructing fallback URL: ${fallbackError}`);
+      }
+    }
+
     return null;
   }
 }

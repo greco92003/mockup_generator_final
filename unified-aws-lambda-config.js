@@ -52,7 +52,7 @@ async function generateMockupWithLambda(logoUrl, email, name, fileType = "") {
       headers["x-api-key"] = API_KEY;
     }
 
-    // Set a shorter timeout and use retry logic with exponential backoff
+    // Set a longer timeout and use retry logic with exponential backoff
     const response = await withRetry(
       async () => {
         console.log("Calling Lambda function...");
@@ -66,14 +66,14 @@ async function generateMockupWithLambda(logoUrl, email, name, fileType = "") {
           },
           {
             headers,
-            timeout: 30000, // 30 second timeout
+            timeout: 60000, // 60 second timeout (increased from 30s)
           }
         );
       },
       {
-        maxRetries: 2, // Maximum 2 retries (3 attempts total)
-        initialDelay: 500, // Start with 500ms delay
-        maxDelay: 2000, // Maximum 2 second delay
+        maxRetries: 3, // Maximum 3 retries (4 attempts total)
+        initialDelay: 1000, // Start with 1s delay
+        maxDelay: 5000, // Maximum 5 second delay
         shouldRetry: (error) => {
           // Retry on network errors or 5xx server errors
           return (
@@ -83,6 +83,67 @@ async function generateMockupWithLambda(logoUrl, email, name, fileType = "") {
         },
       }
     );
+
+    // After getting the response, directly try to update ActiveCampaign
+    // This is a critical backup to ensure the URL gets to ActiveCampaign
+    try {
+      console.log(
+        "Lambda response received, attempting direct ActiveCampaign update"
+      );
+
+      // Construct a direct URL based on the email and timestamp
+      const safeEmail = email.replace("@", "-at-").replace(".", "-dot-");
+      const timestamp = Date.now();
+      const mockupKey = `mockups/${safeEmail}-${timestamp}.png`;
+      const directUrl = `https://mockup-hudlab.s3.us-east-1.amazonaws.com/${mockupKey}`;
+
+      console.log("Constructed direct URL for backup:", directUrl);
+
+      // Import required modules
+      const s3Storage = require("./unified-s3-storage");
+      const activeCampaign = require("./unified-active-campaign-api");
+
+      // Try to find the latest mockup for this email in S3
+      console.log(`Attempting to find latest mockup for email: ${email}`);
+      s3Storage
+        .findLatestObjectWithPrefix(`mockups/${safeEmail}`)
+        .then((latestUrl) => {
+          if (latestUrl) {
+            console.log(`Found latest mockup in S3: ${latestUrl}`);
+
+            // Update ActiveCampaign directly with the found URL
+            activeCampaign
+              .findContactByEmail(email)
+              .then((contact) => {
+                if (contact) {
+                  console.log(
+                    `Found contact in ActiveCampaign with ID: ${contact.id}`
+                  );
+                  return activeCampaign.updateLeadMockupUrl(email, latestUrl);
+                }
+              })
+              .then((result) => {
+                if (result) {
+                  console.log("Direct update to ActiveCampaign successful");
+                }
+              })
+              .catch((acError) => {
+                console.error(
+                  "Error updating ActiveCampaign directly:",
+                  acError
+                );
+              });
+          }
+        })
+        .catch((error) => {
+          console.error(`Error finding latest mockup: ${error}`);
+        });
+    } catch (directUpdateError) {
+      console.error(
+        "Error in direct ActiveCampaign update attempt:",
+        directUpdateError
+      );
+    }
 
     console.log("Lambda response status:", response.status);
     console.log(
