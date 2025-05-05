@@ -199,8 +199,13 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
         name,
         fileExtension // Pass the file extension to inform Lambda about file type
       )
-      .then((actualMockupUrl) => {
-        console.log(`Mockup generated with AWS Lambda: ${actualMockupUrl}`);
+      .then((lambdaResponse) => {
+        console.log(
+          `Received response from Lambda:`,
+          typeof lambdaResponse === "string"
+            ? lambdaResponse
+            : JSON.stringify(lambdaResponse).substring(0, 200) + "..."
+        );
 
         // Clean up any PNG files in the logo-pdf folder if needed
         if (fileExtension === "pdf") {
@@ -211,6 +216,64 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
               console.error("Error cleaning up logo-pdf folder:", error)
             );
         }
+
+        // Extract the mockup URL from the Lambda response
+        let actualMockupUrl = null;
+
+        // If the response is a string, use it directly
+        if (typeof lambdaResponse === "string") {
+          actualMockupUrl = lambdaResponse;
+          console.log(
+            `Using string response as mockup URL: ${actualMockupUrl}`
+          );
+        }
+        // If it's an object, try to extract the URL
+        else if (lambdaResponse && typeof lambdaResponse === "object") {
+          // Try different properties that might contain the URL
+          if (lambdaResponse.mockupUrl) {
+            actualMockupUrl = lambdaResponse.mockupUrl;
+            console.log(
+              `Found mockupUrl in response object: ${actualMockupUrl}`
+            );
+          } else if (lambdaResponse.directUrl) {
+            actualMockupUrl = lambdaResponse.directUrl;
+            console.log(
+              `Found directUrl in response object: ${actualMockupUrl}`
+            );
+          } else if (lambdaResponse.url) {
+            actualMockupUrl = lambdaResponse.url;
+            console.log(`Found url in response object: ${actualMockupUrl}`);
+          }
+
+          // If we still don't have a URL, try to construct one using the email
+          if (!actualMockupUrl) {
+            // Construct a direct URL based on the email and current timestamp
+            const safeEmail = email.replace("@", "-at-").replace(".", "-dot-");
+            const timestamp = Date.now();
+            const mockupKey = `mockups/${safeEmail}-${timestamp}.png`;
+            actualMockupUrl = `https://mockup-hudlab.s3.us-east-1.amazonaws.com/${mockupKey}`;
+            console.log(
+              `Constructed URL based on email and timestamp: ${actualMockupUrl}`
+            );
+
+            // Try to find the latest mockup for this email in S3
+            console.log(`Attempting to find latest mockup for email: ${email}`);
+            s3Storage
+              .findLatestObjectWithPrefix(`mockups/${safeEmail}`)
+              .then((latestUrl) => {
+                if (latestUrl) {
+                  console.log(`Found latest mockup in S3: ${latestUrl}`);
+                  // Update ActiveCampaign with the found URL
+                  asyncProcessor.updateMockupUrlAsync(email, latestUrl);
+                }
+              })
+              .catch((error) => {
+                console.error(`Error finding latest mockup: ${error}`);
+              });
+          }
+        }
+
+        console.log(`Final extracted mockup URL: ${actualMockupUrl}`);
 
         // Update mockup URL in ActiveCampaign with the actual URL from Lambda
         if (actualMockupUrl) {
@@ -236,93 +299,64 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
             console.log("Fixed URL to include region:", finalMockupUrl);
           }
 
-          // Verify that the URL is a direct S3 bucket URL
-          if (
-            !finalMockupUrl.includes("mockup-hudlab.s3") ||
-            !finalMockupUrl.includes("/mockups/")
-          ) {
-            console.warn(
-              "WARNING: Mockup URL does not appear to be a direct S3 bucket URL:",
-              finalMockupUrl
-            );
-            console.log("Attempting to fix the URL format...");
-
-            // Try to extract the key part if it's in a different format
-            if (
-              finalMockupUrl.includes("mockup-hudlab") &&
-              finalMockupUrl.includes("amazonaws.com")
-            ) {
-              const urlParts = finalMockupUrl.split("/");
-              const bucketIndex = urlParts.findIndex((part) =>
-                part.includes("mockup-hudlab")
-              );
-
-              if (bucketIndex >= 0) {
-                const keyParts = urlParts.slice(bucketIndex + 1);
-                const key = keyParts.join("/");
-                finalMockupUrl = `https://mockup-hudlab.s3.us-east-1.amazonaws.com/${key}`;
-                console.log("Corrected URL format:", finalMockupUrl);
-              }
-            }
-          }
-
           // Always update ActiveCampaign with the actual URL from Lambda
           console.log(
             "Updating mockup URL in ActiveCampaign with actual URL from Lambda"
           );
           console.log("Actual mockup URL:", finalMockupUrl);
 
-          // Update the mockup URL in ActiveCampaign
+          // DIRECT APPROACH: Call updateMockupUrlAsync directly
           console.log(
-            "Updating mockup URL in ActiveCampaign with actual URL from Lambda..."
+            "Using direct approach to update mockup URL in ActiveCampaign"
           );
-          console.log(
-            "Final mockup URL being sent to ActiveCampaign:",
-            finalMockupUrl
-          );
+          asyncProcessor.updateMockupUrlAsync(email, finalMockupUrl);
 
-          // Make multiple attempts to update the mockup URL
-          let updateAttempts = 0;
-          const maxUpdateAttempts = 3;
-
-          // Function to update the mockup URL
-          const updateMockupUrl = () => {
-            updateAttempts++;
+          // Also try a direct call to ActiveCampaign API as a backup
+          try {
             console.log(
-              `Update attempt ${updateAttempts}/${maxUpdateAttempts}`
+              "Also making direct call to ActiveCampaign API as backup"
             );
+            const activeCampaign = require("./unified-active-campaign-api");
 
-            try {
-              // Call the async processor without await since it uses setTimeout internally
-              asyncProcessor.updateMockupUrlAsync(email, finalMockupUrl);
-              console.log(
-                `Mockup URL update initiated on attempt ${updateAttempts}`
-              );
-
-              // We can't truly verify success here since the function is asynchronous
-              // and doesn't return a promise we can await
-            } catch (updateError) {
-              console.error(
-                `Error initiating mockup URL update on attempt ${updateAttempts}:`,
-                updateError
-              );
-
-              if (updateAttempts < maxUpdateAttempts) {
-                console.log(`Retrying in 2 seconds...`);
-                setTimeout(updateMockupUrl, 2000);
-              } else {
+            // Find the contact and update the mockup URL field directly
+            activeCampaign
+              .findContactByEmail(email)
+              .then((contact) => {
+                if (contact) {
+                  console.log(
+                    `Found contact in ActiveCampaign with ID: ${contact.id}`
+                  );
+                  return activeCampaign.updateLeadMockupUrl(
+                    email,
+                    finalMockupUrl
+                  );
+                } else {
+                  console.log(
+                    `Contact with email ${email} not found in ActiveCampaign`
+                  );
+                  return null;
+                }
+              })
+              .then((result) => {
+                if (result) {
+                  console.log("Direct update to ActiveCampaign successful");
+                }
+              })
+              .catch((error) => {
                 console.error(
-                  `Failed to initiate mockup URL update after ${maxUpdateAttempts} attempts`
+                  "Error in direct update to ActiveCampaign:",
+                  error
                 );
-              }
-            }
-          };
-
-          // Start the update process
-          updateMockupUrl();
+              });
+          } catch (directError) {
+            console.error(
+              "Error making direct call to ActiveCampaign:",
+              directError
+            );
+          }
         } else {
           console.warn(
-            "Lambda returned a null or undefined mockup URL. No update sent to ActiveCampaign."
+            "Could not extract a valid mockup URL from Lambda response. No update sent to ActiveCampaign."
           );
         }
       })

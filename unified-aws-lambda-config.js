@@ -112,20 +112,18 @@ async function generateMockupWithLambda(logoUrl, email, name, fileType = "") {
       );
     }
 
+    // Log the full response for debugging
+    console.log(
+      "Full Lambda response:",
+      JSON.stringify(response.data, null, 2)
+    );
+
     // Extract mockup URL from response
     let mockupUrl = null;
-
-    // First, try to get the direct URL from the response
-    if (response.data.mockupUrl) {
-      console.log("Found mockupUrl in response:", response.data.mockupUrl);
-      mockupUrl = response.data.mockupUrl;
-    } else if (response.data.url) {
-      console.log("Found url in response:", response.data.url);
-      mockupUrl = response.data.url;
-    }
+    let directUrl = null;
 
     // Check if the response contains a body field (API Gateway format)
-    if (!mockupUrl && response.data.body) {
+    if (response.data.body) {
       try {
         // Try to parse the body if it's a string
         const bodyContent =
@@ -133,31 +131,28 @@ async function generateMockupWithLambda(logoUrl, email, name, fileType = "") {
             ? JSON.parse(response.data.body)
             : response.data.body;
 
-        // If there's a mockupUrl in the body, use it
-        if (bodyContent.mockupUrl) {
+        console.log(
+          "Parsed body content:",
+          JSON.stringify(bodyContent).substring(0, 200) + "..."
+        );
+
+        // First, try to get the direct URL from the body
+        if (bodyContent.directUrl) {
+          console.log(
+            "Found directUrl in response body:",
+            bodyContent.directUrl
+          );
+          directUrl = bodyContent.directUrl;
+          mockupUrl = directUrl; // Use direct URL as primary
+        } else if (bodyContent.mockupUrl) {
           console.log(
             "Found mockupUrl in response body:",
             bodyContent.mockupUrl
           );
           mockupUrl = bodyContent.mockupUrl;
-        } else if (bodyContent.directUrl) {
-          console.log(
-            "Found directUrl in response body:",
-            bodyContent.directUrl
-          );
-          mockupUrl = bodyContent.directUrl;
         } else if (bodyContent.url) {
           console.log("Found url in response body:", bodyContent.url);
           mockupUrl = bodyContent.url;
-        }
-
-        // Also extract timestamp if available
-        if (bodyContent.timestamp) {
-          console.log(
-            "Found timestamp in response body:",
-            bodyContent.timestamp
-          );
-          response.data.timestamp = bodyContent.timestamp;
         }
 
         // Extract mockup key if available
@@ -166,7 +161,38 @@ async function generateMockupWithLambda(logoUrl, email, name, fileType = "") {
             "Found mockupKey in response body:",
             bodyContent.mockupKey
           );
-          response.data.mockupKey = bodyContent.mockupKey;
+
+          // If we have the mockup key but no URL, construct the direct URL
+          if (!mockupUrl && bodyContent.mockupKey) {
+            directUrl = `https://mockup-hudlab.s3.us-east-1.amazonaws.com/${bodyContent.mockupKey}`;
+            console.log("Constructed direct URL from mockupKey:", directUrl);
+            mockupUrl = directUrl;
+          }
+        }
+
+        // Extract email and timestamp if available
+        let email = null;
+        let timestamp = null;
+
+        if (bodyContent.email) {
+          email = bodyContent.email;
+          console.log("Found email in response body:", email);
+        }
+
+        if (bodyContent.timestamp) {
+          timestamp = bodyContent.timestamp;
+          console.log("Found timestamp in response body:", timestamp);
+
+          // If we have email and timestamp but no URL, construct the direct URL
+          if (!mockupUrl && email && timestamp) {
+            const safeEmail = email.replace("@", "-at-").replace(".", "-dot-");
+            directUrl = `https://mockup-hudlab.s3.us-east-1.amazonaws.com/mockups/${safeEmail}-${timestamp}.png`;
+            console.log(
+              "Constructed direct URL from email and timestamp:",
+              directUrl
+            );
+            mockupUrl = directUrl;
+          }
         }
       } catch (parseError) {
         console.error("Error parsing Lambda response body:", parseError);
@@ -174,26 +200,34 @@ async function generateMockupWithLambda(logoUrl, email, name, fileType = "") {
       }
     }
 
-    // Log the full response for debugging
-    console.log(
-      "Full Lambda response:",
-      JSON.stringify(response.data, null, 2)
-    );
+    // If we still don't have a URL, try to get it directly from the response
+    if (!mockupUrl) {
+      if (response.data.directUrl) {
+        console.log("Found directUrl in response:", response.data.directUrl);
+        directUrl = response.data.directUrl;
+        mockupUrl = directUrl;
+      } else if (response.data.mockupUrl) {
+        console.log("Found mockupUrl in response:", response.data.mockupUrl);
+        mockupUrl = response.data.mockupUrl;
+      } else if (response.data.url) {
+        console.log("Found url in response:", response.data.url);
+        mockupUrl = response.data.url;
+      }
+    }
 
-    // Extract timestamp from response if available
-    let timestamp = null;
-    if (response.data.timestamp) {
-      timestamp = response.data.timestamp;
-      console.log("Found timestamp in response:", timestamp);
-    } else if (response.data.body && typeof response.data.body === "string") {
-      try {
-        const bodyContent = JSON.parse(response.data.body);
-        if (bodyContent.timestamp) {
-          timestamp = bodyContent.timestamp;
-          console.log("Found timestamp in response body:", timestamp);
+    // If we still don't have a URL, look for it in the logs
+    if (!mockupUrl) {
+      // Try to extract the URL from the logs if available
+      const logs = response.data.logs || "";
+      if (typeof logs === "string" && logs.includes("DIRECT_MOCKUP_URL_FOR_")) {
+        const match = logs.match(
+          /DIRECT_MOCKUP_URL_FOR_.*?: (https:\/\/.*?\.png)/
+        );
+        if (match && match[1]) {
+          directUrl = match[1];
+          console.log("Extracted direct URL from logs:", directUrl);
+          mockupUrl = directUrl;
         }
-      } catch (parseError) {
-        console.error("Error parsing response body for timestamp:", parseError);
       }
     }
 
@@ -206,19 +240,13 @@ async function generateMockupWithLambda(logoUrl, email, name, fileType = "") {
       return null;
     }
 
-    // We no longer need to fix timestamps in URLs
-    // Instead, we'll focus on using the direct URL from the Lambda function
-    console.log(
-      "Using direct URL from Lambda function without timestamp manipulation"
-    );
-
     // Convert pre-signed URL to direct URL if needed
     if (mockupUrl.includes("?")) {
       console.log("Converting pre-signed URL to direct URL...");
-      const directUrl = mockupUrl.split("?")[0];
+      const extractedDirectUrl = mockupUrl.split("?")[0];
       console.log("Original URL:", mockupUrl);
-      console.log("Direct URL:", directUrl);
-      mockupUrl = directUrl;
+      console.log("Direct URL:", extractedDirectUrl);
+      mockupUrl = extractedDirectUrl;
     }
 
     // Ensure the URL includes the region
@@ -234,37 +262,7 @@ async function generateMockupWithLambda(logoUrl, email, name, fileType = "") {
       console.log("Fixed URL with region:", mockupUrl);
     }
 
-    // Verify that the URL is a direct S3 bucket URL
-    if (
-      !mockupUrl.includes("mockup-hudlab.s3") ||
-      !mockupUrl.includes("/mockups/")
-    ) {
-      console.warn(
-        "WARNING: Mockup URL does not appear to be a direct S3 bucket URL:",
-        mockupUrl
-      );
-
-      // Try to extract the key part if it's in a different format
-      if (
-        mockupUrl.includes("mockup-hudlab") &&
-        mockupUrl.includes("amazonaws.com")
-      ) {
-        const urlParts = mockupUrl.split("/");
-        const bucketIndex = urlParts.findIndex((part) =>
-          part.includes("mockup-hudlab")
-        );
-
-        if (bucketIndex >= 0) {
-          const keyParts = urlParts.slice(bucketIndex + 1);
-          const key = keyParts.join("/");
-          mockupUrl = `https://mockup-hudlab.s3.us-east-1.amazonaws.com/${key}`;
-          console.log("Corrected URL format:", mockupUrl);
-        }
-      }
-    }
-
-    console.log("Mockup generated successfully with Lambda:", mockupUrl);
-
+    console.log("Final mockup URL:", mockupUrl);
     return mockupUrl;
   } catch (error) {
     console.error("Error generating mockup with Lambda:", error);
