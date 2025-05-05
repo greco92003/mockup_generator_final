@@ -543,13 +543,16 @@
             // Submeter o formulário normalmente (isso é mais confiável com o ActiveCampaign)
             form.submit();
 
-            // Após um pequeno delay para garantir que o formulário foi enviado,
-            // redirecionar a página pai para a URL de redirecionamento
+            // Redirecionar imediatamente a página pai para a URL de redirecionamento
+            // Não precisamos esperar o formulário ser enviado completamente, pois o ActiveCampaign
+            // processará os dados mesmo se o usuário for redirecionado
             if (redirectUrl) {
-              console.log("Redirecionando para:", redirectUrl);
+              console.log("Redirecionando imediatamente para:", redirectUrl);
+              // Reduzir o delay para 100ms para melhorar a experiência do usuário
+              // mas ainda dar tempo suficiente para o formulário começar a ser enviado
               setTimeout(() => {
                 redirectParentPage(redirectUrl);
-              }, 500); // Pequeno delay para garantir que o formulário foi enviado
+              }, 100); // Delay mínimo para garantir que o formulário começou a ser enviado
             }
           } catch (error) {
             console.error("Erro ao processar o formulário:", error);

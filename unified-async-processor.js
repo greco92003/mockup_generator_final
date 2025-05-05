@@ -44,37 +44,87 @@ function updateMockupUrlAsync(email, mockupUrl) {
   );
   console.log(`URL do mockup a ser atualizada: ${mockupUrl}`);
 
-  // Usar setTimeout para tornar não-bloqueante
-  setTimeout(async () => {
-    try {
-      // Verificação adicional dentro da tarefa
-      if (!mockupUrl) {
-        console.error(
-          "Tarefa de atualização: mockupUrl está indefinido, pulando processamento"
-        );
-        return;
-      }
+  // Implementar múltiplas tentativas com intervalos crescentes
+  const retryIntervals = [100, 5000, 15000, 30000, 60000]; // 100ms, 5s, 15s, 30s, 60s
 
+  // Função para tentar atualizar com retry
+  const attemptUpdate = (attemptIndex) => {
+    if (attemptIndex >= retryIntervals.length) {
       console.log(
-        "Iniciando atualização assíncrona do URL do mockup no ActiveCampaign..."
+        `Todas as ${retryIntervals.length} tentativas de atualização foram realizadas.`
       );
-
-      try {
-        // Usar a nova função com retry
-        await updateMockupUrlWithRetry(email, mockupUrl);
-        console.log("URL do mockup atualizado com sucesso no ActiveCampaign");
-      } catch (acError) {
-        console.error(
-          "Erro ao atualizar URL do mockup no ActiveCampaign:",
-          acError
-        );
-        console.error("Stack trace:", acError.stack);
-        // Não relançamos o erro já que este é um processamento assíncrono
-      }
-    } catch (error) {
-      console.error("Erro na execução da tarefa assíncrona:", error);
+      return;
     }
-  }, 100);
+
+    const delay = retryIntervals[attemptIndex];
+    console.log(
+      `Agendando tentativa #${attemptIndex + 1} para daqui a ${delay}ms`
+    );
+
+    // Usar setTimeout para tornar não-bloqueante
+    setTimeout(async () => {
+      try {
+        // Verificação adicional dentro da tarefa
+        if (!mockupUrl) {
+          console.error(
+            "Tarefa de atualização: mockupUrl está indefinido, pulando processamento"
+          );
+          return;
+        }
+
+        console.log(
+          `Iniciando tentativa #${
+            attemptIndex + 1
+          } de atualização assíncrona do URL do mockup no ActiveCampaign...`
+        );
+
+        try {
+          // Usar a nova função com retry
+          const result = await updateMockupUrlWithRetry(email, mockupUrl);
+
+          if (result && !result.includes("placeholder")) {
+            console.log(
+              `Tentativa #${
+                attemptIndex + 1
+              }: URL do mockup atualizado com sucesso no ActiveCampaign`
+            );
+          } else {
+            console.warn(
+              `Tentativa #${
+                attemptIndex + 1
+              }: URL ainda contém placeholder ou não é válida`
+            );
+            // Agendar próxima tentativa
+            attemptUpdate(attemptIndex + 1);
+          }
+        } catch (acError) {
+          console.error(
+            `Tentativa #${
+              attemptIndex + 1
+            }: Erro ao atualizar URL do mockup no ActiveCampaign:`,
+            acError
+          );
+          console.error("Stack trace:", acError.stack);
+
+          // Agendar próxima tentativa
+          attemptUpdate(attemptIndex + 1);
+        }
+      } catch (error) {
+        console.error(
+          `Tentativa #${
+            attemptIndex + 1
+          }: Erro na execução da tarefa assíncrona:`,
+          error
+        );
+
+        // Agendar próxima tentativa
+        attemptUpdate(attemptIndex + 1);
+      }
+    }, delay);
+  };
+
+  // Iniciar a primeira tentativa
+  attemptUpdate(0);
 }
 
 /**
@@ -155,10 +205,40 @@ async function updateMockupUrlWithRetry(email, mockupUrl) {
 
     console.log(`Chave do objeto para verificação: ${key}`);
 
+    // Extrair o email e o timestamp da URL para verificação
+    let safeEmail = "";
+    let timestamp = "";
+
+    if (key.includes("mockups/") && key.includes("-at-")) {
+      // Formato esperado: mockups/email-at-domain-dot-com-timestamp.png
+      const keyParts = key.split("/");
+      const filename = keyParts[keyParts.length - 1];
+      const filenameParts = filename.split("-");
+
+      // Encontrar a parte do timestamp (último número antes da extensão)
+      const lastPart = filenameParts[filenameParts.length - 1];
+      if (lastPart.includes(".png")) {
+        timestamp = lastPart.split(".")[0];
+        console.log(`Timestamp extraído da URL: ${timestamp}`);
+      }
+
+      // Reconstruir o email seguro (tudo antes do timestamp)
+      if (timestamp) {
+        const emailParts = filenameParts.slice(0, filenameParts.length - 1);
+        safeEmail = emailParts.join("-");
+        console.log(`Email seguro extraído da URL: ${safeEmail}`);
+      }
+    }
+
     // Aguardar até que o objeto exista e obter a URL
     // A função waitForObjectAndGetUrl foi melhorada para lidar com URLs de placeholder
     // e para procurar objetos com prefixo semelhante
-    const validUrl = await s3Storage.waitForObjectAndGetUrl(key);
+    const validUrl = await s3Storage.waitForObjectAndGetUrl(
+      key,
+      15,
+      2000,
+      20000
+    );
 
     console.log(`URL válida obtida após verificação: ${validUrl}`);
 
@@ -169,18 +249,60 @@ async function updateMockupUrlWithRetry(email, mockupUrl) {
         "Aguardando mais tempo antes de atualizar o ActiveCampaign..."
       );
 
-      // Aguardar mais tempo (10 segundos) e tentar novamente
-      await new Promise((resolve) => setTimeout(resolve, 10000));
+      // Aguardar mais tempo (15 segundos) e tentar novamente
+      await new Promise((resolve) => setTimeout(resolve, 15000));
 
-      // Tentar obter a URL novamente
-      const retryUrl = await s3Storage.waitForObjectAndGetUrl(key);
+      // Tentar obter a URL novamente com mais tentativas
+      const retryUrl = await s3Storage.waitForObjectAndGetUrl(
+        key,
+        20,
+        3000,
+        30000
+      );
       console.log(`URL obtida após espera adicional: ${retryUrl}`);
 
-      // Se ainda for uma URL de fallback, vamos usar a URL original
+      // Se ainda for uma URL de fallback, vamos tentar buscar diretamente pelo email
       if (retryUrl.includes("fallback") || retryUrl.includes("placeholder")) {
-        console.warn("Ainda obtendo URL de fallback, usando URL original");
-        // Não atualizar o ActiveCampaign com uma URL de fallback
-        return mockupUrl;
+        console.warn(
+          "Ainda obtendo URL de fallback, tentando buscar pelo email..."
+        );
+
+        if (safeEmail) {
+          // Tentar buscar qualquer mockup recente para este email
+          const mockupsPrefix = `mockups/${safeEmail}`;
+          console.log(`Buscando mockups com prefixo: ${mockupsPrefix}`);
+
+          const latestMockupUrl = await s3Storage.findLatestObjectWithPrefix(
+            mockupsPrefix
+          );
+
+          if (
+            latestMockupUrl &&
+            !latestMockupUrl.includes("placeholder") &&
+            !latestMockupUrl.includes("fallback")
+          ) {
+            console.log(`Encontrado mockup mais recente: ${latestMockupUrl}`);
+
+            // Atualizar no ActiveCampaign com a URL válida encontrada
+            const activeCampaign = require("./unified-active-campaign-api");
+            await activeCampaign.updateLeadMockupUrl(email, latestMockupUrl);
+
+            console.log(
+              `URL do mockup atualizada com sucesso no ActiveCampaign para: ${email}`
+            );
+            return latestMockupUrl;
+          } else {
+            console.warn(
+              "Não foi possível encontrar um mockup válido, usando URL original"
+            );
+            return mockupUrl;
+          }
+        } else {
+          console.warn(
+            "Não foi possível extrair o email da URL, usando URL original"
+          );
+          return mockupUrl;
+        }
       } else {
         // Atualizar no ActiveCampaign com a URL válida
         const activeCampaign = require("./unified-active-campaign-api");

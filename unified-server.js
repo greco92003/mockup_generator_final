@@ -146,12 +146,17 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
     console.log("Original logo uploaded to S3:", originalLogoUrl);
     console.log("Processed logo uploaded to S3:", logoUrl);
 
-    // Instead of creating a placeholder mockup URL with a timestamp that won't match the Lambda function,
-    // we'll use a consistent format that indicates it's a placeholder and will be updated
+    // Create a placeholder mockup URL with the same timestamp format that the Lambda function will use
+    // This ensures the URL format is consistent and can be properly updated later
     const safeEmail = email.replace("@", "-at-").replace(".", "-dot-");
-    const placeholderMockupUrl = `https://mockup-hudlab.s3.us-east-1.amazonaws.com/mockups/${safeEmail}-placeholder.png`;
+    // Use seconds-based timestamp to match Lambda function format (multiply by 1000 to match milliseconds)
+    const timestamp = Math.floor(Date.now());
+    const placeholderMockupUrl = `https://mockup-hudlab.s3.us-east-1.amazonaws.com/mockups/${safeEmail}-${timestamp}.png`;
 
-    console.log("Using placeholder mockup URL:", placeholderMockupUrl);
+    console.log(
+      "Using placeholder mockup URL with timestamp:",
+      placeholderMockupUrl
+    );
 
     // Return all URLs to the client immediately, including the placeholder mockup URL
     const response = {

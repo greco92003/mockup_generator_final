@@ -681,6 +681,58 @@ async function waitForObjectAndGetUrl(
   }
 }
 
+/**
+ * Find the latest object with a given prefix in S3
+ * @param {string} prefix - Prefix to search for
+ * @param {number} maxKeys - Maximum number of keys to return (default: 20)
+ * @returns {Promise<string|null>} - URL of the latest object or null if not found
+ */
+async function findLatestObjectWithPrefix(prefix, maxKeys = 20) {
+  try {
+    console.log(`Finding latest object with prefix: ${prefix}`);
+
+    const bucket = process.env.S3_BUCKET || "mockup-hudlab";
+
+    // List objects with the given prefix
+    const params = {
+      Bucket: bucket,
+      Prefix: prefix,
+      MaxKeys: maxKeys,
+    };
+
+    const listedObjects = await s3.listObjectsV2(params).promise();
+
+    if (!listedObjects.Contents || listedObjects.Contents.length === 0) {
+      console.log(`No objects found with prefix: ${prefix}`);
+      return null;
+    }
+
+    console.log(
+      `Found ${listedObjects.Contents.length} objects with prefix: ${prefix}`
+    );
+
+    // Sort by LastModified to get the most recent one
+    listedObjects.Contents.sort(
+      (a, b) => new Date(b.LastModified) - new Date(a.LastModified)
+    );
+
+    // Get the most recent object
+    const latestObject = listedObjects.Contents[0];
+    console.log(
+      `Latest object: ${latestObject.Key} (Modified: ${latestObject.LastModified})`
+    );
+
+    // Generate direct URL
+    const directUrl = `https://${bucket}.s3.us-east-1.amazonaws.com/${latestObject.Key}`;
+    console.log(`Generated direct URL: ${directUrl}`);
+
+    return directUrl;
+  } catch (error) {
+    console.error(`Error finding latest object with prefix: ${error}`);
+    return null;
+  }
+}
+
 module.exports = {
   uploadToS3,
   uploadFileToS3,
@@ -691,4 +743,5 @@ module.exports = {
   DEFAULT_EXPIRATION,
   waitForObjectAndGetUrl,
   extractKeyFromS3Url,
+  findLatestObjectWithPrefix,
 };
