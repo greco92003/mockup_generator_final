@@ -668,21 +668,76 @@ async function processLeadBasicInfo(leadData) {
 async function updateLeadMockupUrl(email, mockupUrl) {
   try {
     console.log(`Updating mockup URL for lead: ${email}`);
-    console.log(`Mockup URL: ${mockupUrl}`);
+    console.log(`Initial mockup URL: ${mockupUrl}`);
 
-    // CORREÇÃO CRÍTICA: Verificar se a URL contém "default-mockup.png" e substituir por uma URL específica
-    if (mockupUrl && mockupUrl.includes("default-mockup.png")) {
+    // Import S3 storage module
+    const s3Storage = require("./unified-s3-storage");
+
+    // IMPORTANT: Instead of constructing URLs with timestamps, find the actual mockup in S3
+    // Convert email to the format used in S3 keys
+    const safeEmail = email.replace("@", "-at-").replace(".", "-dot-");
+    const mockupPrefix = `mockups/${safeEmail}`;
+
+    console.log(`Looking for latest mockup with prefix: ${mockupPrefix}`);
+
+    // Try to find the latest mockup for this email in S3
+    let actualMockupUrl = null;
+    try {
+      actualMockupUrl = await s3Storage.findLatestObjectWithPrefix(
+        mockupPrefix
+      );
+      if (actualMockupUrl) {
+        console.log(`Found actual mockup in S3: ${actualMockupUrl}`);
+        // Use the actual S3 URL instead of the constructed one
+        mockupUrl = actualMockupUrl;
+      } else {
+        console.log(`No mockup found in S3 with prefix: ${mockupPrefix}`);
+      }
+    } catch (s3Error) {
+      console.error(`Error finding mockup in S3: ${s3Error}`);
+      // Continue with the provided URL if S3 lookup fails
+    }
+
+    // Ensure we're using a direct S3 URL without query parameters
+    if (mockupUrl && mockupUrl.includes("?")) {
+      const directUrl = mockupUrl.split("?")[0];
+      console.log("Converting pre-signed URL to direct URL:");
+      console.log("Original URL:", mockupUrl);
+      console.log("Direct URL:", directUrl);
+      mockupUrl = directUrl;
+    }
+
+    // Ensure the URL includes the region
+    if (
+      mockupUrl &&
+      mockupUrl.includes("s3.amazonaws.com") &&
+      !mockupUrl.includes("s3.us-east-1.amazonaws.com")
+    ) {
+      console.log("Fixing S3 URL to include region...");
+      mockupUrl = mockupUrl.replace(
+        "s3.amazonaws.com",
+        "s3.us-east-1.amazonaws.com"
+      );
+      console.log("Fixed URL with region:", mockupUrl);
+    }
+
+    // If we still don't have a valid mockup URL, check if the provided URL is valid
+    if (
+      !mockupUrl ||
+      mockupUrl.includes("default-mockup.png") ||
+      mockupUrl.includes("placeholder")
+    ) {
       console.warn(
-        "ALERTA CRÍTICO: Detectada URL padrão 'default-mockup.png' no ActiveCampaign API. Substituindo por URL específica."
+        "No valid mockup URL found. Cannot update ActiveCampaign with an invalid URL."
       );
 
-      // Criar uma URL específica para este usuário
-      const safeEmail = email.replace("@", "-at-").replace(".", "-dot-");
-      // Use seconds-based timestamp to match Lambda function format
-      const timestamp = Math.floor(Date.now() / 1000);
-      mockupUrl = `https://mockup-hudlab.s3.us-east-1.amazonaws.com/mockups/${safeEmail}-${timestamp}.png`;
-
-      console.log(`URL corrigida no ActiveCampaign API: ${mockupUrl}`);
+      // If we couldn't find a valid URL, return null
+      if (!actualMockupUrl) {
+        console.error(
+          "No valid mockup URL available. Skipping ActiveCampaign update."
+        );
+        return null;
+      }
     }
 
     // Find contact
@@ -827,6 +882,33 @@ async function updateLeadMockupUrl(email, mockupUrl) {
             "Verification successful. Current mockup_url value:",
             mockupUrlField.value
           );
+
+          // Verify the timestamp format in the stored URL
+          if (
+            mockupUrlField.value &&
+            mockupUrlField.value.includes("-at-") &&
+            mockupUrlField.value.includes(".png")
+          ) {
+            const urlParts = mockupUrlField.value.split("/");
+            const filename = urlParts[urlParts.length - 1];
+            console.log(`Stored filename: ${filename}`);
+
+            // Extract timestamp if present
+            const matches = filename.match(/-(\d+)\.png$/);
+            if (matches && matches[1]) {
+              console.log(`Stored timestamp: ${matches[1]}`);
+              console.log(
+                `Stored timestamp length: ${matches[1].length} digits`
+              );
+
+              // Check if timestamp is in milliseconds (typically 13 digits) or seconds (typically 10 digits)
+              if (matches[1].length < 13 && matches[1].length > 9) {
+                console.warn(
+                  `WARNING: Stored timestamp appears to be in seconds, not milliseconds: ${matches[1]}`
+                );
+              }
+            }
+          }
         } else {
           console.warn(
             "Verification failed. Could not find mockup_url field in contact's field values."

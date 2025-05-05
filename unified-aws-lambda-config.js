@@ -206,41 +206,11 @@ async function generateMockupWithLambda(logoUrl, email, name, fileType = "") {
       return null;
     }
 
-    // If we have a timestamp but it's not in the URL, fix the URL
-    if (
-      timestamp &&
-      mockupUrl.includes("-at-") &&
-      !mockupUrl.includes(`-${timestamp}`)
-    ) {
-      console.log("Timestamp mismatch detected in URL");
-      console.log("Original URL:", mockupUrl);
-
-      // Extract the email part from the URL
-      const urlParts = mockupUrl.split("/");
-      const filenameWithExt = urlParts[urlParts.length - 1];
-      const filenameParts = filenameWithExt.split("-");
-
-      // Find the part before the timestamp (email)
-      let emailPart = "";
-      for (let i = 0; i < filenameParts.length; i++) {
-        if (filenameParts[i].includes("at") && i < filenameParts.length - 1) {
-          // Found the email part, reconstruct it up to this point
-          emailPart = filenameParts.slice(0, i + 1).join("-");
-          break;
-        }
-      }
-
-      if (emailPart) {
-        // Reconstruct the URL with the correct timestamp
-        const extension = filenameWithExt.split(".").pop();
-        const newFilename = `${emailPart}-${timestamp}.${extension}`;
-        urlParts[urlParts.length - 1] = newFilename;
-        const correctedUrl = urlParts.join("/");
-
-        console.log("Corrected URL with proper timestamp:", correctedUrl);
-        mockupUrl = correctedUrl;
-      }
-    }
+    // We no longer need to fix timestamps in URLs
+    // Instead, we'll focus on using the direct URL from the Lambda function
+    console.log(
+      "Using direct URL from Lambda function without timestamp manipulation"
+    );
 
     // Convert pre-signed URL to direct URL if needed
     if (mockupUrl.includes("?")) {

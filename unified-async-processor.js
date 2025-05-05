@@ -44,6 +44,29 @@ function updateMockupUrlAsync(email, mockupUrl) {
   );
   console.log(`URL do mockup a ser atualizada: ${mockupUrl}`);
 
+  // Verify URL format and extract timestamp if present
+  if (mockupUrl && mockupUrl.includes("-at-") && mockupUrl.includes(".png")) {
+    const urlParts = mockupUrl.split("/");
+    const filename = urlParts[urlParts.length - 1];
+    console.log(`Filename from URL: ${filename}`);
+
+    // Extract timestamp if present
+    const matches = filename.match(/-(\d+)\.png$/);
+    if (matches && matches[1]) {
+      console.log(`Timestamp in URL: ${matches[1]}`);
+      console.log(`Timestamp length: ${matches[1].length} digits`);
+
+      // Check if timestamp is in milliseconds (typically 13 digits) or seconds (typically 10 digits)
+      if (matches[1].length < 13 && matches[1].length > 9) {
+        console.warn(
+          `WARNING: Timestamp appears to be in seconds, not milliseconds: ${matches[1]}`
+        );
+      }
+    } else {
+      console.log(`No timestamp found in filename: ${filename}`);
+    }
+  }
+
   // Implementar múltiplas tentativas com intervalos crescentes
   const retryIntervals = [100, 5000, 15000, 30000, 60000]; // 100ms, 5s, 15s, 30s, 60s
 
@@ -205,29 +228,32 @@ async function updateMockupUrlWithRetry(email, mockupUrl) {
 
     console.log(`Chave do objeto para verificação: ${key}`);
 
-    // Extrair o email e o timestamp da URL para verificação
+    // Extract the email from the URL for verification
     let safeEmail = "";
-    let timestamp = "";
 
     if (key.includes("mockups/") && key.includes("-at-")) {
-      // Formato esperado: mockups/email-at-domain-dot-com-timestamp.png
+      // Expected format: mockups/email-at-domain-dot-com-timestamp.png
       const keyParts = key.split("/");
       const filename = keyParts[keyParts.length - 1];
-      const filenameParts = filename.split("-");
+      console.log(`Filename extracted from key: ${filename}`);
 
-      // Encontrar a parte do timestamp (último número antes da extensão)
-      const lastPart = filenameParts[filenameParts.length - 1];
-      if (lastPart.includes(".png")) {
-        timestamp = lastPart.split(".")[0];
-        console.log(`Timestamp extraído da URL: ${timestamp}`);
+      // Extract the email part (everything before the last dash)
+      const lastDashIndex = filename.lastIndexOf("-");
+      if (lastDashIndex > 0) {
+        safeEmail = filename.substring(0, lastDashIndex);
+        console.log(`Safe email extracted from URL: ${safeEmail}`);
+      } else {
+        // If there's no dash, try to extract the email part before the extension
+        const dotIndex = filename.lastIndexOf(".");
+        if (dotIndex > 0) {
+          safeEmail = filename.substring(0, dotIndex);
+          console.log(`Safe email extracted from URL (no dash): ${safeEmail}`);
+        }
       }
-
-      // Reconstruir o email seguro (tudo antes do timestamp)
-      if (timestamp) {
-        const emailParts = filenameParts.slice(0, filenameParts.length - 1);
-        safeEmail = emailParts.join("-");
-        console.log(`Email seguro extraído da URL: ${safeEmail}`);
-      }
+    } else if (email) {
+      // If we can't extract from the URL but we have the email, use it
+      safeEmail = email.replace("@", "-at-").replace(".", "-dot-");
+      console.log(`Using provided email to create safe email: ${safeEmail}`);
     }
 
     // Aguardar até que o objeto exista e obter a URL
