@@ -1,3 +1,4 @@
+
 /**
  * Unified S3 Storage Module
  *
@@ -494,6 +495,45 @@ async function cleanupLogoPdfFolder(pdfFilename) {
   }
 }
 
+/**
+ * Extrai a chave do objeto a partir de uma URL do S3
+ * @param {string} url - URL do S3
+ * @returns {string} - Chave do objeto
+ */
+function extractKeyFromS3Url(url) {
+  try {
+    console.log(`Extraindo chave do objeto da URL: ${url}`);
+    
+    const urlObj = new URL(url);
+    let key = "";
+    
+    // Lidar com diferentes formatos de URL do S3
+    if (urlObj.hostname.includes("s3.amazonaws.com")) {
+      // Formato: https://bucket-name.s3.amazonaws.com/key
+      // ou https://bucket-name.s3.region.amazonaws.com/key
+      key = urlObj.pathname.substring(1); // Remover barra inicial
+    } else if (
+      urlObj.hostname === "s3.amazonaws.com" ||
+      urlObj.hostname.match(/s3\.[a-z0-9-]+\.amazonaws\.com/)
+    ) {
+      // Formato: https://s3.region.amazonaws.com/bucket-name/key
+      const pathParts = urlObj.pathname.substring(1).split("/");
+      // Ignorar o nome do bucket (primeiro segmento)
+      key = pathParts.slice(1).join("/");
+    } else {
+      // Tentar extrair a chave do pathname
+      key = urlObj.pathname.substring(1);
+    }
+    
+    console.log(`Chave extraída: ${key}`);
+    return key;
+  } catch (error) {
+    console.error("Erro ao extrair chave da URL:", error);
+    // Se não conseguir extrair, retornar a URL original
+    return url;
+  }
+}
+
 module.exports = {
   uploadToS3,
   uploadFileToS3,
@@ -502,4 +542,7 @@ module.exports = {
   saveMockup,
   cleanupLogoPdfFolder,
   DEFAULT_EXPIRATION,
+  waitForObjectAndGetUrl,
+  extractKeyFromS3Url
 };
+

@@ -1,3 +1,4 @@
+
 /**
  * Unified Async Processor Module
  *
@@ -32,146 +33,46 @@ function processLeadBasicInfoAsync(leadData) {
  * @param {string} mockupUrl - URL of the mockup
  */
 function updateMockupUrlAsync(email, mockupUrl) {
-  console.log(`Updating mockup URL asynchronously: ${email}`);
-  console.log(`Mockup URL: ${mockupUrl}`);
-
   if (!mockupUrl) {
-    console.error(`Cannot update mockup URL: mockupUrl is ${mockupUrl}`);
+    console.error("updateMockupUrlAsync: mockupUrl está indefinido, pulando processamento");
     return;
   }
 
-  // Convert mockupUrl to direct URL if it's a pre-signed URL
-  let finalMockupUrl = mockupUrl;
-  if (mockupUrl.includes("?")) {
-    finalMockupUrl = mockupUrl.split("?")[0];
-    console.log(
-      "Converting pre-signed URL to direct URL for mockup_url field:"
-    );
-    console.log("Original URL:", mockupUrl);
-    console.log("Direct URL:", finalMockupUrl);
-  }
+  console.log(`Agendando atualização assíncrona do URL do mockup para: ${email}`);
+  console.log(`URL do mockup a ser atualizada: ${mockupUrl}`);
 
-  // Ensure the URL includes the region
-  if (
-    finalMockupUrl.includes("s3.amazonaws.com") &&
-    !finalMockupUrl.includes("s3.us-east-1.amazonaws.com")
-  ) {
-    console.log("Fixing S3 URL to include region...");
-    finalMockupUrl = finalMockupUrl.replace(
-      "s3.amazonaws.com",
-      "s3.us-east-1.amazonaws.com"
-    );
-    console.log("Fixed URL with region:", finalMockupUrl);
-  }
+  // Adicionar à fila de tarefas com retry
+  addTask(
+    async (data) => {
+      const { email, mockupUrl } = data;
 
-  // Ensure the URL is using the correct bucket format
-  if (!finalMockupUrl.includes("mockup-hudlab.s3.us-east-1.amazonaws.com")) {
-    // Check if it's using a different format but still our bucket
-    if (
-      finalMockupUrl.includes("mockup-hudlab") &&
-      finalMockupUrl.includes("amazonaws.com")
-    ) {
-      console.log("URL is using incorrect format, fixing...");
-      // Extract the key part (everything after the bucket name)
-      const urlParts = finalMockupUrl.split("/");
-      const bucketIndex = urlParts.findIndex((part) =>
-        part.includes("mockup-hudlab")
-      );
-      if (bucketIndex >= 0) {
-        const keyParts = urlParts.slice(bucketIndex + 1);
-        const key = keyParts.join("/");
-        finalMockupUrl = `https://mockup-hudlab.s3.us-east-1.amazonaws.com/${key}`;
-        console.log("Corrected URL format:", finalMockupUrl);
-      }
-    }
-  }
-
-  // IMPORTANTE: Não gerar URLs fictícias. Se a URL não parece válida, não enviar para o ActiveCampaign
-  if (!finalMockupUrl.includes("/mockups/")) {
-    console.error(
-      "ERRO CRÍTICO: A URL do mockup não contém o caminho '/mockups/' esperado. Não será enviada para o ActiveCampaign."
-    );
-    console.error("URL inválida:", finalMockupUrl);
-    return;
-  }
-
-  // Verificar se a URL parece ser uma URL direta do S3 válida
-  if (
-    !finalMockupUrl.match(
-      /https:\/\/mockup-hudlab\.s3\.[a-z0-9-]+\.amazonaws\.com\/mockups\/.+\.png/
-    )
-  ) {
-    console.warn(
-      "AVISO: A URL do mockup não parece ser uma URL direta válida do S3. Verificando formato..."
-    );
-
-    // Verificação adicional para garantir que é uma URL válida
-    if (!finalMockupUrl.endsWith(".png")) {
-      console.error(
-        "ERRO: A URL do mockup não termina com '.png'. Não será enviada para o ActiveCampaign."
-      );
-      console.error("URL inválida:", finalMockupUrl);
-      return;
-    }
-  }
-
-  // Use setTimeout to make this non-blocking
-  setTimeout(async () => {
-    try {
-      console.log(`Starting async update of mockup URL for ${email}`);
-      console.log(
-        `Final mockup URL being sent to ActiveCampaign: ${finalMockupUrl}`
-      );
-
-      // Make multiple attempts to update the mockup URL in case of failure
-      let success = false;
-      let attempts = 0;
-      const maxAttempts = 3;
-
-      while (!success && attempts < maxAttempts) {
-        attempts++;
-        console.log(
-          `Attempt ${attempts} to update mockup URL in ActiveCampaign...`
-        );
-
-        try {
-          const result = await activeCampaign.updateLeadMockupUrl(
-            email,
-            finalMockupUrl
-          );
-
-          if (result) {
-            console.log(
-              `Mockup URL updated successfully (async) on attempt ${attempts}: ${email}`
-            );
-            console.log(`Update result:`, JSON.stringify(result));
-            success = true;
-          } else {
-            console.warn(
-              `Update attempt ${attempts} returned no result, will retry...`
-            );
-            await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1 second before retrying
-          }
-        } catch (attemptError) {
-          console.error(
-            `Error on update attempt ${attempts}:`,
-            attemptError.message
-          );
-          await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1 second before retrying
-        }
-      }
-
-      if (!success) {
+      // Verificação adicional dentro da tarefa
+      if (!mockupUrl) {
         console.error(
-          `Failed to update mockup URL after ${maxAttempts} attempts`
+          "Tarefa de atualização: mockupUrl está indefinido, pulando processamento"
         );
+        return;
       }
-    } catch (error) {
-      console.error("Error updating mockup URL (async):", error);
-      console.error("Error details:", error.message);
-      console.error("Stack trace:", error.stack);
-    }
-  }, 100);
+
+      console.log(
+        "Iniciando atualização assíncrona do URL do mockup no ActiveCampaign..."
+      );
+
+      try {
+        // Usar a nova função com retry
+        await updateMockupUrlWithRetry(email, mockupUrl);
+        console.log("URL do mockup atualizado com sucesso no ActiveCampaign");
+      } catch (acError) {
+        console.error(
+          "Erro ao atualizar URL do mockup no ActiveCampaign:",
+          acError
+        );
+        console.error("Stack trace:", acError.stack);
+        // Não relançamos o erro já que este é um processamento assíncrono
+      }
+    },
+    { email, mockupUrl }
+  );
 }
 
 /**
@@ -226,9 +127,56 @@ function processLeadWithMockupAsync(leadData, mockupUrl) {
   }, 100);
 }
 
+/**
+ * Atualiza a URL do mockup no ActiveCampaign com retry para garantir que o objeto existe
+ * @param {string} email - Email do usuário
+ * @param {string} mockupUrl - URL do mockup ou chave do objeto
+ * @returns {Promise<string>} - URL válida do mockup
+ */
+async function updateMockupUrlWithRetry(email, mockupUrl) {
+  try {
+    console.log(`Iniciando processo de atualização de URL com retry para: ${email}`);
+    console.log(`URL ou chave original: ${mockupUrl}`);
+    
+    // Importar o módulo de storage
+    const s3Storage = require('./unified-s3-storage');
+    
+    // Verificar se mockupUrl é uma URL completa ou apenas uma chave
+    let key = mockupUrl;
+    
+    if (mockupUrl.includes('amazonaws.com')) {
+      // Extrair a chave da URL
+      key = s3Storage.extractKeyFromS3Url(mockupUrl);
+    }
+    
+    console.log(`Chave do objeto para verificação: ${key}`);
+    
+    // Aguardar até que o objeto exista e obter a URL
+    const validUrl = await s3Storage.waitForObjectAndGetUrl(key);
+    
+    console.log(`URL válida obtida após verificação: ${validUrl}`);
+    
+    // Atualizar no ActiveCampaign
+    const activeCampaign = require('./unified-active-campaign-api');
+    await activeCampaign.updateLeadMockupUrl(email, validUrl);
+    
+    console.log(`URL do mockup atualizada com sucesso no ActiveCampaign para: ${email}`);
+    return validUrl;
+  } catch (error) {
+    console.error(`Erro ao atualizar URL do mockup com retry:`, error);
+    throw error;
+  }
+}
+
 module.exports = {
   processLeadBasicInfoAsync,
   updateMockupUrlAsync,
   updateLogoUrlAsync,
   processLeadWithMockupAsync,
+  updateMockupUrlWithRetry,
 };
+
+
+
+
+
