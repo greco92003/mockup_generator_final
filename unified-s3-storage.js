@@ -1,4 +1,3 @@
-
 /**
  * Unified S3 Storage Module
  *
@@ -503,10 +502,10 @@ async function cleanupLogoPdfFolder(pdfFilename) {
 function extractKeyFromS3Url(url) {
   try {
     console.log(`Extraindo chave do objeto da URL: ${url}`);
-    
+
     const urlObj = new URL(url);
     let key = "";
-    
+
     // Lidar com diferentes formatos de URL do S3
     if (urlObj.hostname.includes("s3.amazonaws.com")) {
       // Formato: https://bucket-name.s3.amazonaws.com/key
@@ -524,13 +523,102 @@ function extractKeyFromS3Url(url) {
       // Tentar extrair a chave do pathname
       key = urlObj.pathname.substring(1);
     }
-    
+
     console.log(`Chave extraída: ${key}`);
     return key;
   } catch (error) {
     console.error("Erro ao extrair chave da URL:", error);
     // Se não conseguir extrair, retornar a URL original
     return url;
+  }
+}
+
+/**
+ * Wait for an S3 object to exist and then return its URL
+ * @param {string} key - S3 object key
+ * @param {number} maxRetries - Maximum number of retries (default: 5)
+ * @param {number} initialDelay - Initial delay in ms (default: 1000)
+ * @param {number} maxDelay - Maximum delay in ms (default: 10000)
+ * @param {number} expirationSeconds - Expiration time in seconds for the URL (default: 7 days)
+ * @returns {Promise<string>} - URL of the object
+ */
+async function waitForObjectAndGetUrl(
+  key,
+  maxRetries = 5,
+  initialDelay = 1000,
+  maxDelay = 10000,
+  expirationSeconds = DEFAULT_EXPIRATION
+) {
+  try {
+    console.log(`Waiting for S3 object to exist: ${key}`);
+
+    const bucket = process.env.S3_BUCKET || "mockup-hudlab";
+    let attempt = 0;
+    let lastError;
+
+    while (attempt <= maxRetries) {
+      try {
+        // Check if the object exists
+        console.log(
+          `Checking if object exists (attempt ${attempt + 1}/${
+            maxRetries + 1
+          }): Bucket=${bucket}, Key=${key}`
+        );
+
+        const headParams = {
+          Bucket: bucket,
+          Key: key,
+        };
+
+        await s3.headObject(headParams).promise();
+        console.log(`Object exists in S3 after ${attempt} retries`);
+
+        // Object exists, generate URL
+        const url = await generatePresignedUrl(key, expirationSeconds);
+        return url;
+      } catch (error) {
+        lastError = error;
+
+        // If error is not "NotFound", throw it
+        if (error.code !== "NotFound") {
+          console.error(
+            `Error checking object existence: ${error.code} - ${error.message}`
+          );
+          throw error;
+        }
+
+        attempt++;
+
+        // If we've reached max retries, break
+        if (attempt > maxRetries) {
+          console.warn(`Object not found after ${maxRetries} retries`);
+          break;
+        }
+
+        // Calculate delay with exponential backoff and jitter
+        const delay = Math.min(
+          maxDelay,
+          initialDelay * Math.pow(2, attempt - 1) * (0.9 + Math.random() * 0.2)
+        );
+
+        console.log(
+          `Object not found yet, retrying in ${Math.round(delay)}ms...`
+        );
+
+        // Wait before retrying
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+
+    // If we get here, all retries failed
+    console.error(`Failed to find object after ${maxRetries} retries`);
+
+    // Try to generate a URL anyway as a fallback
+    console.log(`Generating URL anyway as fallback`);
+    return await generatePresignedUrl(key, expirationSeconds);
+  } catch (error) {
+    console.error(`Error in waitForObjectAndGetUrl: ${error}`);
+    throw error;
   }
 }
 
@@ -543,6 +631,5 @@ module.exports = {
   cleanupLogoPdfFolder,
   DEFAULT_EXPIRATION,
   waitForObjectAndGetUrl,
-  extractKeyFromS3Url
+  extractKeyFromS3Url,
 };
-

@@ -1,4 +1,3 @@
-
 /**
  * Unified Async Processor Module
  *
@@ -34,18 +33,20 @@ function processLeadBasicInfoAsync(leadData) {
  */
 function updateMockupUrlAsync(email, mockupUrl) {
   if (!mockupUrl) {
-    console.error("updateMockupUrlAsync: mockupUrl está indefinido, pulando processamento");
+    console.error(
+      "updateMockupUrlAsync: mockupUrl está indefinido, pulando processamento"
+    );
     return;
   }
 
-  console.log(`Agendando atualização assíncrona do URL do mockup para: ${email}`);
+  console.log(
+    `Agendando atualização assíncrona do URL do mockup para: ${email}`
+  );
   console.log(`URL do mockup a ser atualizada: ${mockupUrl}`);
 
-  // Adicionar à fila de tarefas com retry
-  addTask(
-    async (data) => {
-      const { email, mockupUrl } = data;
-
+  // Usar setTimeout para tornar não-bloqueante
+  setTimeout(async () => {
+    try {
       // Verificação adicional dentro da tarefa
       if (!mockupUrl) {
         console.error(
@@ -70,9 +71,10 @@ function updateMockupUrlAsync(email, mockupUrl) {
         console.error("Stack trace:", acError.stack);
         // Não relançamos o erro já que este é um processamento assíncrono
       }
-    },
-    { email, mockupUrl }
-  );
+    } catch (error) {
+      console.error("Erro na execução da tarefa assíncrona:", error);
+    }
+  }, 100);
 }
 
 /**
@@ -135,32 +137,36 @@ function processLeadWithMockupAsync(leadData, mockupUrl) {
  */
 async function updateMockupUrlWithRetry(email, mockupUrl) {
   try {
-    console.log(`Iniciando processo de atualização de URL com retry para: ${email}`);
+    console.log(
+      `Iniciando processo de atualização de URL com retry para: ${email}`
+    );
     console.log(`URL ou chave original: ${mockupUrl}`);
-    
+
     // Importar o módulo de storage
-    const s3Storage = require('./unified-s3-storage');
-    
+    const s3Storage = require("./unified-s3-storage");
+
     // Verificar se mockupUrl é uma URL completa ou apenas uma chave
     let key = mockupUrl;
-    
-    if (mockupUrl.includes('amazonaws.com')) {
+
+    if (mockupUrl.includes("amazonaws.com")) {
       // Extrair a chave da URL
       key = s3Storage.extractKeyFromS3Url(mockupUrl);
     }
-    
+
     console.log(`Chave do objeto para verificação: ${key}`);
-    
+
     // Aguardar até que o objeto exista e obter a URL
     const validUrl = await s3Storage.waitForObjectAndGetUrl(key);
-    
+
     console.log(`URL válida obtida após verificação: ${validUrl}`);
-    
+
     // Atualizar no ActiveCampaign
-    const activeCampaign = require('./unified-active-campaign-api');
+    const activeCampaign = require("./unified-active-campaign-api");
     await activeCampaign.updateLeadMockupUrl(email, validUrl);
-    
-    console.log(`URL do mockup atualizada com sucesso no ActiveCampaign para: ${email}`);
+
+    console.log(
+      `URL do mockup atualizada com sucesso no ActiveCampaign para: ${email}`
+    );
     return validUrl;
   } catch (error) {
     console.error(`Erro ao atualizar URL do mockup com retry:`, error);
@@ -175,8 +181,3 @@ module.exports = {
   processLeadWithMockupAsync,
   updateMockupUrlWithRetry,
 };
-
-
-
-
-
