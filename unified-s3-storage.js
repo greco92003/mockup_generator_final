@@ -556,19 +556,23 @@ async function waitForObjectAndGetUrl(
     let attempt = 0;
     let lastError;
 
-    // If the key contains "placeholder", we need to look for the actual object
-    // that will be created by the Lambda function
-    if (key.includes("placeholder")) {
-      console.log(
-        "Detected placeholder key, will look for actual mockup files"
-      );
-
-      // Extract the base part of the key (without -placeholder.png)
-      const keyParts = key.split("-placeholder");
-      const baseKey = keyParts[0]; // This will be something like "mockups/email-at-domain-dot-com"
-
-      console.log(`Base key for searching actual mockup: ${baseKey}`);
-      key = baseKey; // We'll use this base key for listing objects
+    // We no longer use placeholder URLs
+    // If the key contains an email, we can use it to find the mockup
+    if (key.includes("mockups/") && key.includes("-at-")) {
+      // Extract the email part from the key
+      const keyParts = key.split("/");
+      if (keyParts.length > 1) {
+        const filename = keyParts[keyParts.length - 1];
+        const emailPart =
+          filename.split("-at-")[0] +
+          "-at-" +
+          filename.split("-at-")[1].split("-")[0];
+        const baseKey = `mockups/${emailPart}`;
+        console.log(
+          `Using email part to create base key for searching: ${baseKey}`
+        );
+        key = baseKey;
+      }
     }
 
     while (attempt <= maxRetries) {
@@ -662,19 +666,10 @@ async function waitForObjectAndGetUrl(
     // If we get here, all retries failed
     console.error(`Failed to find object after ${maxRetries} retries`);
 
-    // Generate a fallback URL using the original key
-    if (key.includes("mockups/") && !key.includes(".png")) {
-      // This is a base key without extension, create a proper fallback URL
-      const safeEmail = key.split("mockups/")[1];
-      const fallbackUrl = `https://${bucket}.s3.us-east-1.amazonaws.com/mockups/${safeEmail}-fallback.png`;
-      console.log(`Generated fallback URL: ${fallbackUrl}`);
-      return fallbackUrl;
-    } else {
-      // Use the original key for the fallback URL
-      const fallbackUrl = `https://${bucket}.s3.us-east-1.amazonaws.com/${key}`;
-      console.log(`Generated fallback URL from original key: ${fallbackUrl}`);
-      return fallbackUrl;
-    }
+    // We no longer generate fallback URLs
+    // Return null to indicate that no object was found
+    console.log("No fallback URL will be generated. Returning null.");
+    return null;
   } catch (error) {
     console.error(`Error in waitForObjectAndGetUrl: ${error}`);
     throw error;

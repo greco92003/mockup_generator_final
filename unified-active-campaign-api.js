@@ -721,23 +721,15 @@ async function updateLeadMockupUrl(email, mockupUrl) {
       console.log("Fixed URL with region:", mockupUrl);
     }
 
-    // If we still don't have a valid mockup URL, check if the provided URL is valid
-    if (
-      !mockupUrl ||
-      mockupUrl.includes("default-mockup.png") ||
-      mockupUrl.includes("placeholder")
-    ) {
+    // If we don't have a valid mockup URL, return null
+    if (!mockupUrl) {
       console.warn(
         "No valid mockup URL found. Cannot update ActiveCampaign with an invalid URL."
       );
-
-      // If we couldn't find a valid URL, return null
-      if (!actualMockupUrl) {
-        console.error(
-          "No valid mockup URL available. Skipping ActiveCampaign update."
-        );
-        return null;
-      }
+      console.error(
+        "No valid mockup URL available. Skipping ActiveCampaign update."
+      );
+      return null;
     }
 
     // Find contact
