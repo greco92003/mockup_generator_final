@@ -156,18 +156,51 @@ async function updateMockupUrlWithRetry(email, mockupUrl) {
     console.log(`Chave do objeto para verificação: ${key}`);
 
     // Aguardar até que o objeto exista e obter a URL
+    // A função waitForObjectAndGetUrl foi melhorada para lidar com URLs de placeholder
+    // e para procurar objetos com prefixo semelhante
     const validUrl = await s3Storage.waitForObjectAndGetUrl(key);
 
     console.log(`URL válida obtida após verificação: ${validUrl}`);
 
-    // Atualizar no ActiveCampaign
-    const activeCampaign = require("./unified-active-campaign-api");
-    await activeCampaign.updateLeadMockupUrl(email, validUrl);
+    // Verificar se a URL é válida (não contém "fallback" ou "placeholder")
+    if (validUrl.includes("fallback") || validUrl.includes("placeholder")) {
+      console.warn(`URL obtida contém fallback ou placeholder: ${validUrl}`);
+      console.warn(
+        "Aguardando mais tempo antes de atualizar o ActiveCampaign..."
+      );
 
-    console.log(
-      `URL do mockup atualizada com sucesso no ActiveCampaign para: ${email}`
-    );
-    return validUrl;
+      // Aguardar mais tempo (10 segundos) e tentar novamente
+      await new Promise((resolve) => setTimeout(resolve, 10000));
+
+      // Tentar obter a URL novamente
+      const retryUrl = await s3Storage.waitForObjectAndGetUrl(key);
+      console.log(`URL obtida após espera adicional: ${retryUrl}`);
+
+      // Se ainda for uma URL de fallback, vamos usar a URL original
+      if (retryUrl.includes("fallback") || retryUrl.includes("placeholder")) {
+        console.warn("Ainda obtendo URL de fallback, usando URL original");
+        // Não atualizar o ActiveCampaign com uma URL de fallback
+        return mockupUrl;
+      } else {
+        // Atualizar no ActiveCampaign com a URL válida
+        const activeCampaign = require("./unified-active-campaign-api");
+        await activeCampaign.updateLeadMockupUrl(email, retryUrl);
+
+        console.log(
+          `URL do mockup atualizada com sucesso no ActiveCampaign para: ${email}`
+        );
+        return retryUrl;
+      }
+    } else {
+      // Atualizar no ActiveCampaign com a URL válida
+      const activeCampaign = require("./unified-active-campaign-api");
+      await activeCampaign.updateLeadMockupUrl(email, validUrl);
+
+      console.log(
+        `URL do mockup atualizada com sucesso no ActiveCampaign para: ${email}`
+      );
+      return validUrl;
+    }
   } catch (error) {
     console.error(`Erro ao atualizar URL do mockup com retry:`, error);
     throw error;

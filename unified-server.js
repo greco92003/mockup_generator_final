@@ -146,13 +146,12 @@ app.post("/api/mockup", upload.single("logo"), async (req, res) => {
     console.log("Original logo uploaded to S3:", originalLogoUrl);
     console.log("Processed logo uploaded to S3:", logoUrl);
 
-    // Create a placeholder mockup URL that will be updated later
-    // This ensures the form has a value for the mockup_url field
+    // Instead of creating a placeholder mockup URL with a timestamp that won't match the Lambda function,
+    // we'll use a consistent format that indicates it's a placeholder and will be updated
     const safeEmail = email.replace("@", "-at-").replace(".", "-dot-");
-    const timestamp = Date.now();
-    const placeholderMockupUrl = `https://mockup-hudlab.s3.us-east-1.amazonaws.com/mockups/${safeEmail}-${timestamp}.png`;
+    const placeholderMockupUrl = `https://mockup-hudlab.s3.us-east-1.amazonaws.com/mockups/${safeEmail}-placeholder.png`;
 
-    console.log("Generated placeholder mockup URL:", placeholderMockupUrl);
+    console.log("Using placeholder mockup URL:", placeholderMockupUrl);
 
     // Return all URLs to the client immediately, including the placeholder mockup URL
     const response = {

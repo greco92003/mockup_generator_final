@@ -536,17 +536,17 @@ function extractKeyFromS3Url(url) {
 /**
  * Wait for an S3 object to exist and then return its URL
  * @param {string} key - S3 object key
- * @param {number} maxRetries - Maximum number of retries (default: 5)
- * @param {number} initialDelay - Initial delay in ms (default: 1000)
- * @param {number} maxDelay - Maximum delay in ms (default: 10000)
+ * @param {number} maxRetries - Maximum number of retries (default: 10)
+ * @param {number} initialDelay - Initial delay in ms (default: 2000)
+ * @param {number} maxDelay - Maximum delay in ms (default: 20000)
  * @param {number} expirationSeconds - Expiration time in seconds for the URL (default: 7 days)
  * @returns {Promise<string>} - URL of the object
  */
 async function waitForObjectAndGetUrl(
   key,
-  maxRetries = 5,
-  initialDelay = 1000,
-  maxDelay = 10000,
+  maxRetries = 10,
+  initialDelay = 2000,
+  maxDelay = 20000,
   expirationSeconds = DEFAULT_EXPIRATION
 ) {
   try {
@@ -556,42 +556,67 @@ async function waitForObjectAndGetUrl(
     let attempt = 0;
     let lastError;
 
+    // If the key contains "placeholder", we need to look for the actual object
+    // that will be created by the Lambda function
+    if (key.includes("placeholder")) {
+      console.log(
+        "Detected placeholder key, will look for actual mockup files"
+      );
+
+      // Extract the base part of the key (without -placeholder.png)
+      const keyParts = key.split("-placeholder");
+      const baseKey = keyParts[0]; // This will be something like "mockups/email-at-domain-dot-com"
+
+      console.log(`Base key for searching actual mockup: ${baseKey}`);
+      key = baseKey; // We'll use this base key for listing objects
+    }
+
     while (attempt <= maxRetries) {
       try {
-        // Check if the object exists
+        // Instead of checking for a specific object, list objects with the prefix
+        // to find any matching mockups for this email
         console.log(
-          `Checking if object exists (attempt ${attempt + 1}/${
+          `Listing objects with prefix (attempt ${attempt + 1}/${
             maxRetries + 1
-          }): Bucket=${bucket}, Key=${key}`
+          }): Bucket=${bucket}, Prefix=${key}`
         );
 
-        const headParams = {
+        const listParams = {
           Bucket: bucket,
-          Key: key,
+          Prefix: key,
+          MaxKeys: 10,
         };
 
-        await s3.headObject(headParams).promise();
-        console.log(`Object exists in S3 after ${attempt} retries`);
+        const listedObjects = await s3.listObjectsV2(listParams).promise();
 
-        // Object exists, generate URL
-        const url = await generatePresignedUrl(key, expirationSeconds);
-        return url;
-      } catch (error) {
-        lastError = error;
-
-        // If error is not "NotFound", throw it
-        if (error.code !== "NotFound") {
-          console.error(
-            `Error checking object existence: ${error.code} - ${error.message}`
+        if (listedObjects.Contents && listedObjects.Contents.length > 0) {
+          // Sort by LastModified to get the most recent one
+          listedObjects.Contents.sort(
+            (a, b) => new Date(b.LastModified) - new Date(a.LastModified)
           );
-          throw error;
+
+          // Get the most recent object
+          const latestObject = listedObjects.Contents[0];
+          console.log(
+            `Found ${listedObjects.Contents.length} objects with prefix ${key}`
+          );
+          console.log(
+            `Using most recent object: ${latestObject.Key} (Modified: ${latestObject.LastModified})`
+          );
+
+          // Generate direct URL without pre-signed parameters
+          const directUrl = `https://${bucket}.s3.us-east-1.amazonaws.com/${latestObject.Key}`;
+          console.log(`Generated direct URL: ${directUrl}`);
+
+          return directUrl;
         }
 
+        console.log(`No objects found with prefix ${key}`);
         attempt++;
 
         // If we've reached max retries, break
         if (attempt > maxRetries) {
-          console.warn(`Object not found after ${maxRetries} retries`);
+          console.warn(`No objects found after ${maxRetries} retries`);
           break;
         }
 
@@ -602,8 +627,32 @@ async function waitForObjectAndGetUrl(
         );
 
         console.log(
-          `Object not found yet, retrying in ${Math.round(delay)}ms...`
+          `No objects found yet, retrying in ${Math.round(delay)}ms...`
         );
+
+        // Wait before retrying
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      } catch (error) {
+        lastError = error;
+        console.error(
+          `Error listing objects: ${error.code} - ${error.message}`
+        );
+
+        attempt++;
+
+        // If we've reached max retries, break
+        if (attempt > maxRetries) {
+          console.warn(`Error after ${maxRetries} retries`);
+          break;
+        }
+
+        // Calculate delay with exponential backoff and jitter
+        const delay = Math.min(
+          maxDelay,
+          initialDelay * Math.pow(2, attempt - 1) * (0.9 + Math.random() * 0.2)
+        );
+
+        console.log(`Error occurred, retrying in ${Math.round(delay)}ms...`);
 
         // Wait before retrying
         await new Promise((resolve) => setTimeout(resolve, delay));
@@ -613,9 +662,19 @@ async function waitForObjectAndGetUrl(
     // If we get here, all retries failed
     console.error(`Failed to find object after ${maxRetries} retries`);
 
-    // Try to generate a URL anyway as a fallback
-    console.log(`Generating URL anyway as fallback`);
-    return await generatePresignedUrl(key, expirationSeconds);
+    // Generate a fallback URL using the original key
+    if (key.includes("mockups/") && !key.includes(".png")) {
+      // This is a base key without extension, create a proper fallback URL
+      const safeEmail = key.split("mockups/")[1];
+      const fallbackUrl = `https://${bucket}.s3.us-east-1.amazonaws.com/mockups/${safeEmail}-fallback.png`;
+      console.log(`Generated fallback URL: ${fallbackUrl}`);
+      return fallbackUrl;
+    } else {
+      // Use the original key for the fallback URL
+      const fallbackUrl = `https://${bucket}.s3.us-east-1.amazonaws.com/${key}`;
+      console.log(`Generated fallback URL from original key: ${fallbackUrl}`);
+      return fallbackUrl;
+    }
   } catch (error) {
     console.error(`Error in waitForObjectAndGetUrl: ${error}`);
     throw error;
