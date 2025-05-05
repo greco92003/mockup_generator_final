@@ -182,9 +182,14 @@ def create_mockup(logo_url, email, name):
         output.seek(0)
 
         # Generate a unique key for the mockup
-        timestamp = int(time.time())
+        # Use a timestamp with millisecond precision to match JavaScript's Date.now()
+        # Multiply by 1000 and truncate to ensure consistency
+        timestamp = int(time.time() * 1000)
         safe_email = email.replace('@', '-at-').replace('.', '-dot-')
         mockup_key = f"mockups/{safe_email}-{timestamp}.png"
+
+        # Log the exact timestamp for debugging
+        print(f"Generated timestamp for mockup: {timestamp}")
 
         # Upload the mockup to S3 and get a pre-signed URL
         print(f"Uploading mockup to S3: {S3_BUCKET}/{mockup_key}")
@@ -208,6 +213,8 @@ def create_mockup(logo_url, email, name):
                 'presignedUrl': mockup_url,  # Include pre-signed URL for reference
                 'email': email,
                 'name': name,
+                'timestamp': timestamp,  # Include the timestamp for debugging
+                'mockupKey': mockup_key,  # Include the full key for debugging
                 'expiresIn': URL_EXPIRATION
             })
         }

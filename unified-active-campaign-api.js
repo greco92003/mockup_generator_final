@@ -678,7 +678,8 @@ async function updateLeadMockupUrl(email, mockupUrl) {
 
       // Criar uma URL específica para este usuário
       const safeEmail = email.replace("@", "-at-").replace(".", "-dot-");
-      const timestamp = Date.now();
+      // Use seconds-based timestamp to match Lambda function format
+      const timestamp = Math.floor(Date.now() / 1000);
       mockupUrl = `https://mockup-hudlab.s3.us-east-1.amazonaws.com/mockups/${safeEmail}-${timestamp}.png`;
 
       console.log(`URL corrigida no ActiveCampaign API: ${mockupUrl}`);

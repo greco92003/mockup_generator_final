@@ -150,6 +150,24 @@ async function generateMockupWithLambda(logoUrl, email, name, fileType = "") {
           console.log("Found url in response body:", bodyContent.url);
           mockupUrl = bodyContent.url;
         }
+
+        // Also extract timestamp if available
+        if (bodyContent.timestamp) {
+          console.log(
+            "Found timestamp in response body:",
+            bodyContent.timestamp
+          );
+          response.data.timestamp = bodyContent.timestamp;
+        }
+
+        // Extract mockup key if available
+        if (bodyContent.mockupKey) {
+          console.log(
+            "Found mockupKey in response body:",
+            bodyContent.mockupKey
+          );
+          response.data.mockupKey = bodyContent.mockupKey;
+        }
       } catch (parseError) {
         console.error("Error parsing Lambda response body:", parseError);
         console.error("Response body:", response.data.body);
@@ -162,6 +180,23 @@ async function generateMockupWithLambda(logoUrl, email, name, fileType = "") {
       JSON.stringify(response.data, null, 2)
     );
 
+    // Extract timestamp from response if available
+    let timestamp = null;
+    if (response.data.timestamp) {
+      timestamp = response.data.timestamp;
+      console.log("Found timestamp in response:", timestamp);
+    } else if (response.data.body && typeof response.data.body === "string") {
+      try {
+        const bodyContent = JSON.parse(response.data.body);
+        if (bodyContent.timestamp) {
+          timestamp = bodyContent.timestamp;
+          console.log("Found timestamp in response body:", timestamp);
+        }
+      } catch (parseError) {
+        console.error("Error parsing response body for timestamp:", parseError);
+      }
+    }
+
     if (!mockupUrl) {
       console.error("No mockup URL found in Lambda response");
       console.error("Response data:", JSON.stringify(response.data, null, 2));
@@ -169,6 +204,42 @@ async function generateMockupWithLambda(logoUrl, email, name, fileType = "") {
       // In this case, we don't want to generate a fallback URL anymore
       // We'll return null and let the caller handle it
       return null;
+    }
+
+    // If we have a timestamp but it's not in the URL, fix the URL
+    if (
+      timestamp &&
+      mockupUrl.includes("-at-") &&
+      !mockupUrl.includes(`-${timestamp}`)
+    ) {
+      console.log("Timestamp mismatch detected in URL");
+      console.log("Original URL:", mockupUrl);
+
+      // Extract the email part from the URL
+      const urlParts = mockupUrl.split("/");
+      const filenameWithExt = urlParts[urlParts.length - 1];
+      const filenameParts = filenameWithExt.split("-");
+
+      // Find the part before the timestamp (email)
+      let emailPart = "";
+      for (let i = 0; i < filenameParts.length; i++) {
+        if (filenameParts[i].includes("at") && i < filenameParts.length - 1) {
+          // Found the email part, reconstruct it up to this point
+          emailPart = filenameParts.slice(0, i + 1).join("-");
+          break;
+        }
+      }
+
+      if (emailPart) {
+        // Reconstruct the URL with the correct timestamp
+        const extension = filenameWithExt.split(".").pop();
+        const newFilename = `${emailPart}-${timestamp}.${extension}`;
+        urlParts[urlParts.length - 1] = newFilename;
+        const correctedUrl = urlParts.join("/");
+
+        console.log("Corrected URL with proper timestamp:", correctedUrl);
+        mockupUrl = correctedUrl;
+      }
     }
 
     // Convert pre-signed URL to direct URL if needed
