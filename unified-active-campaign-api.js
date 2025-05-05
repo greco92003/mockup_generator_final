@@ -25,6 +25,53 @@ console.log(
 );
 
 /**
+ * Verify ActiveCampaign credentials
+ * @returns {Promise<boolean>} - True if credentials are valid, false otherwise
+ */
+async function verifyCredentials() {
+  try {
+    console.log("Verifying ActiveCampaign credentials...");
+
+    const response = await fetch(`${AC_API_URL}/api/3/users/me`, {
+      method: "GET",
+      headers: {
+        "Api-Token": AC_API_KEY,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+    });
+
+    const data = await response.json();
+
+    if (data.user) {
+      console.log("ActiveCampaign credentials are valid!");
+      console.log(
+        `Authenticated as: ${data.user.username} (${data.user.email})`
+      );
+      return true;
+    }
+
+    console.error("ActiveCampaign credentials are invalid!");
+    console.error("API response:", JSON.stringify(data));
+    return false;
+  } catch (error) {
+    console.error("Error verifying ActiveCampaign credentials:", error);
+    console.error("Error details:", error.message);
+    console.error("Stack trace:", error.stack);
+    return false;
+  }
+}
+
+// Verify credentials on startup
+verifyCredentials().then((valid) => {
+  if (!valid) {
+    console.error(
+      "WARNING: ActiveCampaign credentials are invalid! Users will not be created in ActiveCampaign."
+    );
+  }
+});
+
+/**
  * Find a contact in ActiveCampaign by email
  * @param {string} email - Email to search for
  * @returns {Promise<object|null>} - Contact object or null if not found
@@ -70,7 +117,28 @@ async function createContact(contactData) {
     const { email, firstName, lastName, phone } = contactData;
 
     console.log(`Creating contact in ActiveCampaign: ${email}`);
+    console.log(`Contact data:`, JSON.stringify(contactData));
 
+    // Validate input data
+    if (!email) {
+      console.error("Invalid contact data: Missing email");
+      throw new Error("Invalid contact data: Missing email");
+    }
+
+    // Prepare request body
+    const requestBody = {
+      contact: {
+        email,
+        firstName: firstName || "",
+        lastName: lastName || "",
+        phone: phone || "",
+      },
+    };
+
+    console.log(`Request body:`, JSON.stringify(requestBody));
+
+    // Make the API request
+    console.log(`Making API request to: ${AC_API_URL}/api/3/contacts`);
     const response = await fetch(`${AC_API_URL}/api/3/contacts`, {
       method: "POST",
       headers: {
@@ -78,27 +146,38 @@ async function createContact(contactData) {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      body: JSON.stringify({
-        contact: {
-          email,
-          firstName,
-          lastName,
-          phone,
-        },
-      }),
+      body: JSON.stringify(requestBody),
     });
 
+    console.log(`API response status: ${response.status}`);
+
+    // Check for HTTP errors
+    if (!response.ok) {
+      console.error(`HTTP error: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      console.error(`Error response body: ${errorText}`);
+      throw new Error(`HTTP error: ${response.status} ${response.statusText}`);
+    }
+
     const data = await response.json();
+    console.log(`API response data:`, JSON.stringify(data));
 
     if (data.contact) {
       console.log(`Contact created in ActiveCampaign: ${data.contact.id}`);
       return data.contact;
     }
 
+    // If we get here, the API returned a successful response but no contact data
+    console.error(
+      `Failed to create contact. API response:`,
+      JSON.stringify(data)
+    );
     throw new Error(`Failed to create contact: ${JSON.stringify(data)}`);
   } catch (error) {
     console.error("Error creating contact in ActiveCampaign:", error);
-    throw error;
+    console.error("Error details:", error.message);
+    console.error("Stack trace:", error.stack);
+    throw new Error(`Failed to create contact: ${error.message}`);
   }
 }
 
@@ -599,11 +678,18 @@ async function processLeadWithMockup(leadData, mockupUrl) {
 async function processLeadBasicInfo(leadData) {
   try {
     console.log(`Processing basic lead information: ${leadData.email}`);
+    console.log(`Lead data:`, JSON.stringify(leadData));
+
+    // Validate input data
+    if (!leadData || !leadData.email) {
+      console.error("Invalid lead data: Missing email");
+      throw new Error("Invalid lead data: Missing email");
+    }
 
     const { email, name, phone, segmento } = leadData;
 
     // Split name into first and last name
-    let firstName = name;
+    let firstName = name || "";
     let lastName = "";
 
     if (name && name.includes(" ")) {
@@ -612,10 +698,25 @@ async function processLeadBasicInfo(leadData) {
       lastName = nameParts.slice(1).join(" ");
     }
 
+    console.log(`Parsed name: firstName=${firstName}, lastName=${lastName}`);
+
+    // Verify credentials before proceeding
+    const credentialsValid = await verifyCredentials();
+    if (!credentialsValid) {
+      console.error(
+        "Cannot process lead: ActiveCampaign credentials are invalid"
+      );
+      throw new Error("ActiveCampaign credentials are invalid");
+    }
+
     // Find or create contact
+    console.log(`Looking for existing contact with email: ${email}`);
     let contact = await findContactByEmail(email);
 
     if (!contact) {
+      console.log(
+        `Contact not found. Creating new contact with email: ${email}`
+      );
       // Create new contact
       contact = await createContact({
         email,
@@ -623,7 +724,9 @@ async function processLeadBasicInfo(leadData) {
         lastName,
         phone,
       });
+      console.log(`New contact created with ID: ${contact.id}`);
     } else {
+      console.log(`Contact found with ID: ${contact.id}. Updating contact...`);
       // Update existing contact
       contact = await updateContact({
         id: contact.id,
@@ -632,6 +735,7 @@ async function processLeadBasicInfo(leadData) {
         lastName,
         phone,
       });
+      console.log(`Contact updated successfully: ${contact.id}`);
     }
 
     // Process segmento field if provided
@@ -642,20 +746,33 @@ async function processLeadBasicInfo(leadData) {
         "Segmento de Negócio",
         "DROPDOWN"
       );
+      console.log(`Segmento field ID: ${segmentoField.id}`);
 
       // Update custom field with segmento value
-      await updateContactCustomField(contact.id, segmentoField.id, segmento);
+      const segmentoResult = await updateContactCustomField(
+        contact.id,
+        segmentoField.id,
+        segmento
+      );
+      console.log(`Segmento field updated: ${JSON.stringify(segmentoResult)}`);
     }
 
     // Add contact to default list
+    console.log(`Adding contact to default list: Mockup Generator`);
     const defaultList = await findOrCreateList("Mockup Generator");
-    await addContactToList(contact.id, defaultList.id);
+    console.log(`Default list ID: ${defaultList.id}`);
+    const listResult = await addContactToList(contact.id, defaultList.id);
+    console.log(`Contact added to list: ${JSON.stringify(listResult)}`);
 
     console.log(`Lead basic info processed successfully: ${contact.id}`);
     return { contact };
   } catch (error) {
     console.error("Error processing lead basic info:", error);
-    throw error;
+    console.error("Error details:", error.message);
+    console.error("Stack trace:", error.stack);
+
+    // Rethrow the error with more context
+    throw new Error(`Failed to process lead: ${error.message}`);
   }
 }
 

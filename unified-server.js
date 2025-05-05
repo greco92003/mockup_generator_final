@@ -386,7 +386,7 @@ app.get("/test-parent", (req, res) => {
 /**
  * Diagnostic endpoint to check server status and configuration
  */
-app.get("/api/diagnostics", (req, res) => {
+app.get("/api/diagnostics", async (req, res) => {
   try {
     // Check directories
     const directories = [
@@ -425,15 +425,98 @@ app.get("/api/diagnostics", (req, res) => {
       REDIRECT_URL: REDIRECT_URL,
     };
 
+    // Check ActiveCampaign connection
+    let activeCampaignStatus = "Unknown";
+    let activeCampaignDetails = null;
+
+    try {
+      // Verify ActiveCampaign credentials
+      const response = await fetch(
+        `${activeCampaign.AC_API_URL}/api/3/users/me`,
+        {
+          method: "GET",
+          headers: {
+            "Api-Token": process.env.ACTIVE_CAMPAIGN_API_KEY,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.user) {
+        activeCampaignStatus = "Connected";
+        activeCampaignDetails = {
+          username: data.user.username,
+          email: data.user.email,
+          firstName: data.user.firstName,
+          lastName: data.user.lastName,
+        };
+      } else {
+        activeCampaignStatus = "Error";
+        activeCampaignDetails = data;
+      }
+    } catch (acError) {
+      activeCampaignStatus = "Error";
+      activeCampaignDetails = {
+        message: acError.message,
+        stack:
+          process.env.NODE_ENV === "development" ? acError.stack : undefined,
+      };
+    }
+
     // Return diagnostic information
     res.json({
       status: "OK",
       timestamp: new Date().toISOString(),
       directories: directoryStatus,
       environment: envVars,
+      activeCampaign: {
+        status: activeCampaignStatus,
+        details: activeCampaignDetails,
+      },
     });
   } catch (error) {
     console.error("Error in diagnostics endpoint:", error);
+    res.status(500).json({
+      status: "ERROR",
+      error: error.message,
+      stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
+    });
+  }
+});
+
+/**
+ * Test endpoint to create a contact in ActiveCampaign
+ */
+app.get("/api/test-active-campaign", async (req, res) => {
+  try {
+    const testEmail = req.query.email || "test@example.com";
+    const testName = req.query.name || "Test User";
+    const testPhone = req.query.phone || "123456789";
+    const testSegmento = req.query.segmento || "Teste";
+
+    console.log(`Testing ActiveCampaign with email: ${testEmail}`);
+
+    // Create test lead data
+    const testLeadData = {
+      email: testEmail,
+      name: testName,
+      phone: testPhone,
+      segmento: testSegmento,
+    };
+
+    // Process lead directly (not async)
+    const result = await activeCampaign.processLeadBasicInfo(testLeadData);
+
+    res.json({
+      status: "OK",
+      message: "Test contact created successfully",
+      result: result,
+    });
+  } catch (error) {
+    console.error("Error in test-active-campaign endpoint:", error);
     res.status(500).json({
       status: "ERROR",
       error: error.message,

@@ -12,16 +12,58 @@ const activeCampaign = require("./unified-active-campaign-api");
  */
 function processLeadBasicInfoAsync(leadData) {
   console.log(`Processing lead basic info asynchronously: ${leadData.email}`);
+  console.log(`Lead data:`, JSON.stringify(leadData));
+
+  // Validate input data
+  if (!leadData || !leadData.email) {
+    console.error("Invalid lead data: Missing email");
+    return;
+  }
 
   // Use setTimeout to make this non-blocking
   setTimeout(async () => {
     try {
-      await activeCampaign.processLeadBasicInfo(leadData);
-      console.log(
-        `Lead basic info processed successfully (async): ${leadData.email}`
-      );
+      console.log(`Starting async processing for lead: ${leadData.email}`);
+
+      // Add retry logic
+      let retryCount = 0;
+      const maxRetries = 3;
+      let success = false;
+
+      while (retryCount < maxRetries && !success) {
+        try {
+          if (retryCount > 0) {
+            console.log(
+              `Retry attempt ${retryCount} for lead: ${leadData.email}`
+            );
+            // Wait longer between retries
+            await new Promise((resolve) =>
+              setTimeout(resolve, 2000 * retryCount)
+            );
+          }
+
+          const result = await activeCampaign.processLeadBasicInfo(leadData);
+          console.log(
+            `Lead basic info processed successfully (async): ${leadData.email}`
+          );
+          console.log(`Result:`, JSON.stringify(result));
+          success = true;
+        } catch (retryError) {
+          retryCount++;
+          console.error(`Error on attempt ${retryCount}:`, retryError);
+
+          if (retryCount >= maxRetries) {
+            throw retryError; // Rethrow the last error if we've exhausted retries
+          }
+        }
+      }
     } catch (error) {
       console.error("Error processing lead basic info (async):", error);
+      console.error("Error details:", error.message);
+      console.error("Stack trace:", error.stack);
+      console.error(
+        "CRITICAL: Failed to create contact in ActiveCampaign after multiple retries!"
+      );
     }
   }, 100);
 }
