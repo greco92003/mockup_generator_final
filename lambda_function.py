@@ -183,7 +183,6 @@ def create_mockup(logo_url, email, name):
 
         # Generate a unique key for the mockup
         # Use a timestamp with millisecond precision to match JavaScript's Date.now()
-        # Multiply by 1000 and truncate to ensure consistency
         timestamp = int(time.time() * 1000)
         safe_email = email.replace('@', '-at-').replace('.', '-dot-')
         mockup_key = f"mockups/{safe_email}-{timestamp}.png"
@@ -199,6 +198,9 @@ def create_mockup(logo_url, email, name):
         # Generate direct URL (without query parameters)
         direct_url = f"https://{S3_BUCKET}.s3.{REGION}.amazonaws.com/{mockup_key}"
         print(f"Direct URL: {direct_url}")
+
+        # Log the direct URL for easy access in CloudWatch logs
+        print(f"DIRECT_MOCKUP_URL_FOR_{email}: {direct_url}")
 
         return {
             'statusCode': 200,

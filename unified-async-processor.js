@@ -109,82 +109,75 @@ function updateMockupUrlAsync(email, mockupUrl) {
     }
   }
 
-  // Implementar múltiplas tentativas com intervalos crescentes
-  const retryIntervals = [100, 5000, 15000, 30000, 60000]; // 100ms, 5s, 15s, 30s, 60s
+  // Simplified approach with fewer retries and more direct execution
+  const retryIntervals = [100, 3000, 10000]; // 100ms, 3s, 10s
 
-  // Função para tentar atualizar com retry
+  // Function to attempt update with retry
   const attemptUpdate = (attemptIndex) => {
     if (attemptIndex >= retryIntervals.length) {
-      console.log(
-        `Todas as ${retryIntervals.length} tentativas de atualização foram realizadas.`
-      );
+      console.log(`All ${retryIntervals.length} update attempts completed.`);
       return;
     }
 
     const delay = retryIntervals[attemptIndex];
-    console.log(
-      `Agendando tentativa #${attemptIndex + 1} para daqui a ${delay}ms`
-    );
+    console.log(`Scheduling attempt #${attemptIndex + 1} in ${delay}ms`);
 
-    // Usar setTimeout para tornar não-bloqueante
+    // Use setTimeout to make it non-blocking
     setTimeout(async () => {
       try {
-        // Verificação adicional dentro da tarefa
-        if (!mockupUrl) {
-          console.error(
-            "Tarefa de atualização: mockupUrl está indefinido, pulando processamento"
-          );
-          return;
-        }
-
         console.log(
-          `Iniciando tentativa #${
+          `Starting attempt #${
             attemptIndex + 1
-          } de atualização assíncrona do URL do mockup no ActiveCampaign...`
+          } to update mockup URL in ActiveCampaign...`
         );
 
         try {
-          // Usar a nova função com retry
+          // Use the improved retry function
           const result = await updateMockupUrlWithRetry(email, mockupUrl);
 
           if (result) {
             console.log(
-              `Tentativa #${
+              `Attempt #${
                 attemptIndex + 1
-              }: URL do mockup atualizado com sucesso no ActiveCampaign`
+              }: Mockup URL successfully updated in ActiveCampaign`
             );
           } else {
-            console.warn(`Tentativa #${attemptIndex + 1}: URL não é válida`);
-            // Agendar próxima tentativa
-            attemptUpdate(attemptIndex + 1);
+            console.warn(`Attempt #${attemptIndex + 1}: No valid URL found`);
+
+            // Try a more direct approach on the next attempt
+            if (attemptIndex + 1 < retryIntervals.length) {
+              console.log(`Will try a more direct approach on next attempt`);
+              attemptUpdate(attemptIndex + 1);
+            }
           }
         } catch (acError) {
           console.error(
-            `Tentativa #${
+            `Attempt #${
               attemptIndex + 1
-            }: Erro ao atualizar URL do mockup no ActiveCampaign:`,
+            }: Error updating mockup URL in ActiveCampaign:`,
             acError
           );
-          console.error("Stack trace:", acError.stack);
 
-          // Agendar próxima tentativa
-          attemptUpdate(attemptIndex + 1);
+          // Schedule next attempt
+          if (attemptIndex + 1 < retryIntervals.length) {
+            attemptUpdate(attemptIndex + 1);
+          }
         }
       } catch (error) {
         console.error(
-          `Tentativa #${
-            attemptIndex + 1
-          }: Erro na execução da tarefa assíncrona:`,
+          `Attempt #${attemptIndex + 1}: Error in async task execution:`,
           error
         );
 
-        // Agendar próxima tentativa
-        attemptUpdate(attemptIndex + 1);
+        // Schedule next attempt
+        if (attemptIndex + 1 < retryIntervals.length) {
+          attemptUpdate(attemptIndex + 1);
+        }
       }
     }, delay);
   };
 
-  // Iniciar a primeira tentativa
+  // Start the first attempt
   attemptUpdate(0);
 }
 
@@ -256,95 +249,71 @@ async function updateMockupUrlWithRetry(email, mockupUrl) {
     // Importar o módulo de storage
     const s3Storage = require("./unified-s3-storage");
 
-    // Verificar se mockupUrl é uma URL completa ou apenas uma chave
-    let key = mockupUrl;
+    // Convert email to the format used in S3 keys
+    const safeEmail = email.replace("@", "-at-").replace(".", "-dot-");
+    const mockupsPrefix = `mockups/${safeEmail}`;
 
-    if (mockupUrl.includes("amazonaws.com")) {
-      // Extrair a chave da URL
-      key = s3Storage.extractKeyFromS3Url(mockupUrl);
-    }
+    console.log(`Looking for latest mockup with prefix: ${mockupsPrefix}`);
 
-    console.log(`Chave do objeto para verificação: ${key}`);
+    // DIRECT APPROACH: Try to find the latest mockup for this email in S3
+    try {
+      const latestMockupUrl = await s3Storage.findLatestObjectWithPrefix(
+        mockupsPrefix
+      );
 
-    // Extract the email from the URL for verification
-    let safeEmail = "";
+      if (latestMockupUrl) {
+        console.log(`Found latest mockup in S3: ${latestMockupUrl}`);
 
-    if (key.includes("mockups/") && key.includes("-at-")) {
-      // Expected format: mockups/email-at-domain-dot-com-timestamp.png
-      const keyParts = key.split("/");
-      const filename = keyParts[keyParts.length - 1];
-      console.log(`Filename extracted from key: ${filename}`);
+        // Update ActiveCampaign with the direct URL found
+        const activeCampaign = require("./unified-active-campaign-api");
+        await activeCampaign.updateLeadMockupUrl(email, latestMockupUrl);
 
-      // Extract the email part (everything before the last dash)
-      const lastDashIndex = filename.lastIndexOf("-");
-      if (lastDashIndex > 0) {
-        safeEmail = filename.substring(0, lastDashIndex);
-        console.log(`Safe email extracted from URL: ${safeEmail}`);
-      } else {
-        // If there's no dash, try to extract the email part before the extension
-        const dotIndex = filename.lastIndexOf(".");
-        if (dotIndex > 0) {
-          safeEmail = filename.substring(0, dotIndex);
-          console.log(`Safe email extracted from URL (no dash): ${safeEmail}`);
-        }
-      }
-    } else if (email) {
-      // If we can't extract from the URL but we have the email, use it
-      safeEmail = email.replace("@", "-at-").replace(".", "-dot-");
-      console.log(`Using provided email to create safe email: ${safeEmail}`);
-    }
-
-    // Aguardar até que o objeto exista e obter a URL
-    // A função waitForObjectAndGetUrl foi melhorada para lidar com URLs de placeholder
-    // e para procurar objetos com prefixo semelhante
-    const validUrl = await s3Storage.waitForObjectAndGetUrl(
-      key,
-      15,
-      2000,
-      20000
-    );
-
-    console.log(`URL válida obtida após verificação: ${validUrl}`);
-
-    // Always use the direct URL from S3
-    console.log(`Valid URL obtained after verification: ${validUrl}`);
-
-    // If we have a valid email, try to find the latest mockup for this email
-    if (email) {
-      const safeEmail = email.replace("@", "-at-").replace(".", "-dot-");
-      const mockupsPrefix = `mockups/${safeEmail}`;
-      console.log(`Looking for mockups with prefix: ${mockupsPrefix}`);
-
-      try {
-        const latestMockupUrl = await s3Storage.findLatestObjectWithPrefix(
-          mockupsPrefix
+        console.log(
+          `Mockup URL successfully updated in ActiveCampaign for: ${email}`
         );
-
-        if (latestMockupUrl) {
-          console.log(`Found latest mockup: ${latestMockupUrl}`);
-
-          // Update ActiveCampaign with the valid URL found
-          const activeCampaign = require("./unified-active-campaign-api");
-          await activeCampaign.updateLeadMockupUrl(email, latestMockupUrl);
-
-          console.log(
-            `Mockup URL successfully updated in ActiveCampaign for: ${email}`
-          );
-          return latestMockupUrl;
-        }
-      } catch (error) {
-        console.error(`Error finding latest mockup: ${error}`);
+        return latestMockupUrl;
+      } else {
+        console.log(`No mockup found in S3 with prefix: ${mockupsPrefix}`);
       }
+    } catch (s3Error) {
+      console.error(`Error finding mockup in S3: ${s3Error}`);
     }
 
-    // If we couldn't find a mockup by email, use the valid URL
-    const activeCampaign = require("./unified-active-campaign-api");
-    await activeCampaign.updateLeadMockupUrl(email, validUrl);
+    // FALLBACK: If we couldn't find a mockup by email prefix, try using the provided URL
+    if (mockupUrl) {
+      console.log(`Using provided mockup URL as fallback: ${mockupUrl}`);
 
-    console.log(
-      `Mockup URL successfully updated in ActiveCampaign for: ${email}`
-    );
-    return validUrl;
+      // Ensure we're using a direct S3 URL without query parameters
+      let finalUrl = mockupUrl;
+      if (finalUrl.includes("?")) {
+        finalUrl = finalUrl.split("?")[0];
+        console.log("Converted pre-signed URL to direct URL:", finalUrl);
+      }
+
+      // Ensure the URL includes the region
+      if (
+        finalUrl.includes("s3.amazonaws.com") &&
+        !finalUrl.includes("s3.us-east-1.amazonaws.com")
+      ) {
+        finalUrl = finalUrl.replace(
+          "s3.amazonaws.com",
+          "s3.us-east-1.amazonaws.com"
+        );
+        console.log("Fixed URL to include region:", finalUrl);
+      }
+
+      // Update ActiveCampaign with the provided URL
+      const activeCampaign = require("./unified-active-campaign-api");
+      await activeCampaign.updateLeadMockupUrl(email, finalUrl);
+
+      console.log(
+        `Mockup URL successfully updated in ActiveCampaign using provided URL for: ${email}`
+      );
+      return finalUrl;
+    }
+
+    console.error("No valid mockup URL found for email:", email);
+    return null;
   } catch (error) {
     console.error(`Erro ao atualizar URL do mockup com retry:`, error);
     throw error;

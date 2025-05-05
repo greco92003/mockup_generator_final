@@ -787,36 +787,16 @@ async function updateLeadMockupUrl(email, mockupUrl) {
     console.log(`Updating mockup URL for lead: ${email}`);
     console.log(`Initial mockup URL: ${mockupUrl}`);
 
-    // Import S3 storage module
-    const s3Storage = require("./unified-s3-storage");
-
-    // IMPORTANT: Instead of constructing URLs with timestamps, find the actual mockup in S3
-    // Convert email to the format used in S3 keys
-    const safeEmail = email.replace("@", "-at-").replace(".", "-dot-");
-    const mockupPrefix = `mockups/${safeEmail}`;
-
-    console.log(`Looking for latest mockup with prefix: ${mockupPrefix}`);
-
-    // Try to find the latest mockup for this email in S3
-    let actualMockupUrl = null;
-    try {
-      actualMockupUrl = await s3Storage.findLatestObjectWithPrefix(
-        mockupPrefix
+    // If we don't have a valid mockup URL, return null
+    if (!mockupUrl) {
+      console.warn(
+        "No valid mockup URL provided. Cannot update ActiveCampaign with an invalid URL."
       );
-      if (actualMockupUrl) {
-        console.log(`Found actual mockup in S3: ${actualMockupUrl}`);
-        // Use the actual S3 URL instead of the constructed one
-        mockupUrl = actualMockupUrl;
-      } else {
-        console.log(`No mockup found in S3 with prefix: ${mockupPrefix}`);
-      }
-    } catch (s3Error) {
-      console.error(`Error finding mockup in S3: ${s3Error}`);
-      // Continue with the provided URL if S3 lookup fails
+      return null;
     }
 
     // Ensure we're using a direct S3 URL without query parameters
-    if (mockupUrl && mockupUrl.includes("?")) {
+    if (mockupUrl.includes("?")) {
       const directUrl = mockupUrl.split("?")[0];
       console.log("Converting pre-signed URL to direct URL:");
       console.log("Original URL:", mockupUrl);
@@ -826,7 +806,6 @@ async function updateLeadMockupUrl(email, mockupUrl) {
 
     // Ensure the URL includes the region
     if (
-      mockupUrl &&
       mockupUrl.includes("s3.amazonaws.com") &&
       !mockupUrl.includes("s3.us-east-1.amazonaws.com")
     ) {
@@ -836,17 +815,6 @@ async function updateLeadMockupUrl(email, mockupUrl) {
         "s3.us-east-1.amazonaws.com"
       );
       console.log("Fixed URL with region:", mockupUrl);
-    }
-
-    // If we don't have a valid mockup URL, return null
-    if (!mockupUrl) {
-      console.warn(
-        "No valid mockup URL found. Cannot update ActiveCampaign with an invalid URL."
-      );
-      console.error(
-        "No valid mockup URL available. Skipping ActiveCampaign update."
-      );
-      return null;
     }
 
     // Find contact
@@ -860,176 +828,113 @@ async function updateLeadMockupUrl(email, mockupUrl) {
 
     console.log(`Contact found in ActiveCampaign with ID: ${contact.id}`);
 
-    // Try multiple approaches to update the mockup_url field
-    let result = null;
-    let success = false;
-
-    // Approach 1: Use the updateContactCustomField function
+    // DIRECT APPROACH: Use hardcoded field ID 41 for mockup_url
     try {
-      console.log("Approach 1: Using updateContactCustomField function");
+      console.log("Using direct API call with hardcoded field ID 41");
 
-      // Find or create mockup_url custom field
-      console.log(`Finding or creating mockup_url custom field`);
-      const mockupField = await createOrUpdateCustomField("mockup_url", "TEXT");
-      console.log(`mockup_url field ID: ${mockupField.id}`);
+      // Make a direct API call to update the field
+      const response = await fetch(`${AC_API_URL}/api/3/fieldValues`, {
+        method: "POST",
+        headers: {
+          "Api-Token": AC_API_KEY,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          fieldValue: {
+            contact: contact.id,
+            field: 41, // Hardcoded ID for mockup_url
+            value: mockupUrl,
+          },
+        }),
+      });
 
-      // Update custom field with mockup URL
-      console.log(
-        `Updating contact ${contact.id} field ${mockupField.id} with value: ${mockupUrl}`
-      );
-      result = await updateContactCustomField(
-        contact.id,
-        mockupField.id,
-        mockupUrl
-      );
+      const data = await response.json();
 
-      if (result) {
-        console.log("Approach 1 successful");
-        success = true;
+      if (data.fieldValue) {
+        console.log("Direct approach successful");
+        console.log("Field value updated:", data.fieldValue);
+
+        // Verify the update
+        try {
+          console.log("Verifying the update...");
+          const fieldValues = await getContactFieldValues(contact.id);
+          const mockupUrlField = fieldValues.find(
+            (field) => parseInt(field.field) === 41
+          );
+
+          if (mockupUrlField) {
+            console.log(
+              "Verification successful. Current mockup_url value:",
+              mockupUrlField.value
+            );
+
+            if (mockupUrlField.value === mockupUrl) {
+              console.log("URL was correctly updated in ActiveCampaign!");
+            } else {
+              console.warn(
+                "URL in ActiveCampaign doesn't match the one we tried to set:",
+                mockupUrlField.value
+              );
+            }
+          } else {
+            console.warn(
+              "Verification failed. Could not find mockup_url field in contact's field values."
+            );
+          }
+        } catch (verifyError) {
+          console.error("Error verifying update:", verifyError.message);
+        }
+
+        return data.fieldValue;
       } else {
-        console.warn("Approach 1 failed, trying approach 2");
+        console.warn("Direct approach failed, trying fallback approach");
       }
-    } catch (error1) {
-      console.error("Error in approach 1:", error1.message);
+    } catch (error) {
+      console.error("Error in direct approach:", error.message);
     }
 
-    // Approach 2: Use direct API call with hardcoded field ID
-    if (!success) {
-      try {
-        console.log(
-          "Approach 2: Using direct API call with hardcoded field ID 41"
-        );
+    // FALLBACK APPROACH: Use the contacts endpoint with fieldValues
+    try {
+      console.log("Fallback: Using contacts endpoint with fieldValues");
 
-        // Make a direct API call to update the field
-        const response = await fetch(`${AC_API_URL}/api/3/fieldValues`, {
-          method: "POST",
+      // Try a direct approach using the contacts endpoint
+      const directResponse = await fetch(
+        `${AC_API_URL}/api/3/contacts/${contact.id}`,
+        {
+          method: "PUT",
           headers: {
             "Api-Token": AC_API_KEY,
             "Content-Type": "application/json",
             Accept: "application/json",
           },
           body: JSON.stringify({
-            fieldValue: {
-              contact: contact.id,
-              field: 41, // Hardcoded ID for mockup_url
-              value: mockupUrl,
+            contact: {
+              fieldValues: [
+                {
+                  field: 41, // Hardcoded ID for mockup_url
+                  value: mockupUrl,
+                },
+              ],
             },
           }),
-        });
-
-        const data = await response.json();
-
-        if (data.fieldValue) {
-          console.log("Approach 2 successful");
-          console.log("Field value updated:", data.fieldValue);
-          result = data.fieldValue;
-          success = true;
-        } else {
-          console.warn("Approach 2 failed, trying approach 3");
         }
-      } catch (error2) {
-        console.error("Error in approach 2:", error2.message);
+      );
+
+      const directData = await directResponse.json();
+
+      if (directData.contact) {
+        console.log("Fallback approach successful");
+        console.log("Contact updated:", directData.contact.id);
+        return { field: 41, value: mockupUrl };
+      } else {
+        console.error("Fallback approach failed");
+        console.error("API response:", directData);
+        return null;
       }
-    }
-
-    // Approach 3: Use the contacts endpoint with fieldValues
-    if (!success) {
-      try {
-        console.log("Approach 3: Using contacts endpoint with fieldValues");
-
-        // Try a direct approach using the contacts endpoint
-        const directResponse = await fetch(
-          `${AC_API_URL}/api/3/contacts/${contact.id}`,
-          {
-            method: "PUT",
-            headers: {
-              "Api-Token": AC_API_KEY,
-              "Content-Type": "application/json",
-              Accept: "application/json",
-            },
-            body: JSON.stringify({
-              contact: {
-                fieldValues: [
-                  {
-                    field: 41, // Hardcoded ID for mockup_url
-                    value: mockupUrl,
-                  },
-                ],
-              },
-            }),
-          }
-        );
-
-        const directData = await directResponse.json();
-
-        if (directData.contact) {
-          console.log("Approach 3 successful");
-          result = { field: 41, value: mockupUrl };
-          success = true;
-        } else {
-          console.warn("Approach 3 failed");
-        }
-      } catch (error3) {
-        console.error("Error in approach 3:", error3.message);
-      }
-    }
-
-    if (success) {
-      console.log(`Mockup URL updated successfully for lead: ${email}`);
-      console.log(`Update result:`, JSON.stringify(result));
-
-      // Verify the update
-      try {
-        console.log("Verifying the update...");
-        const fieldValues = await getContactFieldValues(contact.id);
-        const mockupUrlField = fieldValues.find(
-          (field) => parseInt(field.field) === 41
-        );
-
-        if (mockupUrlField) {
-          console.log(
-            "Verification successful. Current mockup_url value:",
-            mockupUrlField.value
-          );
-
-          // Verify the timestamp format in the stored URL
-          if (
-            mockupUrlField.value &&
-            mockupUrlField.value.includes("-at-") &&
-            mockupUrlField.value.includes(".png")
-          ) {
-            const urlParts = mockupUrlField.value.split("/");
-            const filename = urlParts[urlParts.length - 1];
-            console.log(`Stored filename: ${filename}`);
-
-            // Extract timestamp if present
-            const matches = filename.match(/-(\d+)\.png$/);
-            if (matches && matches[1]) {
-              console.log(`Stored timestamp: ${matches[1]}`);
-              console.log(
-                `Stored timestamp length: ${matches[1].length} digits`
-              );
-
-              // Check if timestamp is in milliseconds (typically 13 digits) or seconds (typically 10 digits)
-              if (matches[1].length < 13 && matches[1].length > 9) {
-                console.warn(
-                  `WARNING: Stored timestamp appears to be in seconds, not milliseconds: ${matches[1]}`
-                );
-              }
-            }
-          }
-        } else {
-          console.warn(
-            "Verification failed. Could not find mockup_url field in contact's field values."
-          );
-        }
-      } catch (verifyError) {
-        console.error("Error verifying update:", verifyError.message);
-      }
-
-      return result;
-    } else {
-      console.error("All approaches failed to update mockup_url field");
+    } catch (error) {
+      console.error("Error in fallback approach:", error.message);
+      console.error("Stack trace:", error.stack);
       return null;
     }
   } catch (error) {
