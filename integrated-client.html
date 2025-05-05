@@ -133,16 +133,26 @@
         display: none;
         text-align: center;
         margin: 20px 0;
+        padding: 20px;
+        background-color: rgba(255, 255, 255, 0.9);
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
       }
 
       .loading-spinner {
         border: 4px solid #f3f3f3;
         border-top: 4px solid #3498db;
         border-radius: 50%;
-        width: 30px;
-        height: 30px;
+        width: 40px;
+        height: 40px;
         animation: spin 1s linear infinite;
-        margin: 0 auto 10px;
+        margin: 0 auto 15px;
+      }
+
+      .loading-details {
+        font-size: 14px;
+        color: #666;
+        margin-top: 5px;
       }
 
       @keyframes spin {
@@ -368,7 +378,8 @@
       <!-- Indicador de carregamento -->
       <div class="loading" id="loadingIndicator">
         <div class="loading-spinner"></div>
-        <p>Processando seu pedido, por favor aguarde...</p>
+        <p>Gerando seu mockup personalizado, por favor aguarde...</p>
+        <p class="loading-details">Este processo pode levar até 15 segundos.</p>
       </div>
     </div>
 
@@ -519,6 +530,8 @@
             if (data.url) {
               document.getElementById("mockup_url").value = data.url;
               console.log("Campo mockup_url preenchido com:", data.url);
+            } else {
+              console.warn("Nenhuma URL de mockup recebida do servidor");
             }
 
             if (data.originalLogoUrl) {
@@ -533,26 +546,18 @@
             // Verificar se temos uma URL de redirecionamento
             const redirectUrl = data.redirect_url;
 
-            // Modificar o comportamento do formulário para usar AJAX em vez de submit tradicional
-            // Isso permite que possamos controlar o redirecionamento após o envio
-            const acFormData = new FormData(form);
+            console.log("Enviando formulário para o ActiveCampaign...");
 
-            // Enviar o formulário para o ActiveCampaign via AJAX
-            console.log("Enviando dados para o ActiveCampaign via AJAX...");
-
-            // Submeter o formulário normalmente (isso é mais confiável com o ActiveCampaign)
+            // Submeter o formulário para o ActiveCampaign
             form.submit();
 
-            // Redirecionar imediatamente a página pai para a URL de redirecionamento
-            // Não precisamos esperar o formulário ser enviado completamente, pois o ActiveCampaign
-            // processará os dados mesmo se o usuário for redirecionado
+            // Redirecionar a página pai para a URL de redirecionamento após um pequeno delay
+            // para garantir que o formulário foi enviado
             if (redirectUrl) {
-              console.log("Redirecionando imediatamente para:", redirectUrl);
-              // Reduzir o delay para 100ms para melhorar a experiência do usuário
-              // mas ainda dar tempo suficiente para o formulário começar a ser enviado
+              console.log("Redirecionando para:", redirectUrl);
               setTimeout(() => {
                 redirectParentPage(redirectUrl);
-              }, 100); // Delay mínimo para garantir que o formulário começou a ser enviado
+              }, 500); // Delay um pouco maior para garantir que o formulário foi enviado
             }
           } catch (error) {
             console.error("Erro ao processar o formulário:", error);
