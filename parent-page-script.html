@@ -1,0 +1,57 @@
+<script>
+  // Capturar UTMs da URL pai
+  function getUtmParams() {
+    const utmParams = {};
+    const queryString = window.location.search.substring(1);
+    const pairs = queryString.split('&');
+    
+    for (let i = 0; i < pairs.length; i++) {
+      if (!pairs[i]) continue;
+      
+      const pair = pairs[i].split('=');
+      const key = decodeURIComponent(pair[0].toLowerCase());
+      
+      if (key.startsWith('utm_')) {
+        utmParams[key] = decodeURIComponent(pair[1] || '');
+      }
+    }
+    
+    console.log("UTM params captured:", utmParams);
+    return utmParams;
+  }
+
+  // Enviar UTMs para o iframe quando ele estiver carregado
+  window.addEventListener('DOMContentLoaded', function() {
+    // Seleciona o iframe do formulário HUD LAB
+    const iframe = document.querySelector('iframe[title="Formulário HUD LAB"]');
+    
+    if (iframe) {
+      console.log("Formulário HUD LAB iframe encontrado, configurando listener de load");
+      
+      // Enviar UTMs para o iframe quando ele estiver carregado
+      iframe.addEventListener('load', function() {
+        const utmParams = getUtmParams();
+        console.log("Enviando parâmetros UTM para o iframe:", utmParams);
+        
+        // Envia a mensagem para o iframe
+        iframe.contentWindow.postMessage({
+          type: 'UTM_PARAMS',
+          utmParams: utmParams
+        }, 'https://mockup-generator-final.vercel.app');
+      });
+    } else {
+      console.warn("Iframe do formulário HUD LAB não encontrado");
+    }
+  });
+</script>
+
+<!-- O iframe já deve estar na página, mas aqui está como ele deve ser: -->
+<!-- 
+<iframe 
+  src="https://mockup-generator-final.vercel.app/" 
+  width="100%" 
+  height="850vh" 
+  style="border:none; max-width: 500px; margin: 0 auto; display: block;" 
+  title="Formulário HUD LAB"
+></iframe>
+-->
