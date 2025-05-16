@@ -461,7 +461,7 @@
         }
         
         // Tentar capturar UTMs diretamente da URL como fallback
-        window.addEventListener('load', getUtmParamsFromUrl);
+        getUtmParamsFromUrl();
 
         // Update file name when file is selected
         fileInput.addEventListener("change", function () {
@@ -619,4 +619,5 @@
     </script>
   </body>
 </html>
+
 
