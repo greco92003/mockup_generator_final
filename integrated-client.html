@@ -268,6 +268,9 @@
                   placeholder="Nome*"
                   required
                 />
+                <div class="error-message" id="nameError">
+                  Por favor, informe seu nome.
+                </div>
               </div>
             </div>
 
@@ -281,6 +284,9 @@
                   placeholder="Telefone/Whats com DDD*"
                   required
                 />
+                <div class="error-message" id="phoneError">
+                  Por favor, informe seu telefone com DDD.
+                </div>
               </div>
             </div>
 
@@ -391,6 +397,9 @@
         const fileInput = document.getElementById("logo");
         const fileName = document.getElementById("fileName");
         const loadingIndicator = document.getElementById("loadingIndicator");
+        // Adicionar referências para os novos erros
+        const nameError = document.getElementById("nameError");
+        const phoneError = document.getElementById("phoneError");
 
         // Função para redirecionar a página pai (se estiver em um iframe)
         function redirectParentPage(url) {
@@ -490,6 +499,22 @@
           // Reset error messages
           emailError.style.display = "none";
           logoError.style.display = "none";
+          nameError.style.display = "none";
+          phoneError.style.display = "none";
+
+          // Validate name
+          const name = document.getElementById("fullname").value;
+          if (!name || name.trim() === "") {
+            nameError.style.display = "block";
+            return;
+          }
+
+          // Validate phone
+          const phone = document.getElementById("phone").value;
+          if (!phone || phone.trim() === "") {
+            phoneError.style.display = "block";
+            return;
+          }
 
           // Validate email
           const email = document.getElementById("email").value;
