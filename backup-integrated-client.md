@@ -222,6 +222,7 @@
         margin-top: 20px;
       }
     </style>
+
   </head>
   <body>
     <div class="main-container">
@@ -366,7 +367,8 @@
               <p>
                 <strong>Atenção:</strong> O upload do arquivo de logo é
                 obrigatório para a geração do mockup. Por favor, selecione um
-                arquivo PNG, JPG ou PDF antes de enviar o formulário.
+                arquivo PNG, JPG ou PDF antes de enviar o formulário. Tamanho
+                máximo para arquivos: 2MB.
               </p>
             </div>
 
@@ -413,62 +415,84 @@
         }
 
         // Adicionar listener para receber UTMs da página pai
-        window.addEventListener('message', function(event) {
+        window.addEventListener("message", function (event) {
           // Verificar origem para segurança - domínio da HUD LAB
           const allowedOrigins = [
-            'https://hudlab.com.br',
-            'http://hudlab.com.br',
-            'https://www.hudlab.com.br',
-            'http://www.hudlab.com.br'
+            "https://hudlab.com.br",
+            "http://hudlab.com.br",
+            "https://www.hudlab.com.br",
+            "http://www.hudlab.com.br",
           ];
-          
+
           // Verificar se a mensagem vem de uma origem confiável
           if (!allowedOrigins.includes(event.origin)) {
-            console.log("Mensagem recebida de origem não confiável:", event.origin);
+            console.log(
+              "Mensagem recebida de origem não confiável:",
+              event.origin
+            );
             return;
           }
-          
+
           // Verificar se a mensagem contém dados UTM
-          if (event.data && event.data.type === 'UTM_PARAMS') {
-            console.log("Parâmetros UTM recebidos da página pai:", event.data.utmParams);
+          if (event.data && event.data.type === "UTM_PARAMS") {
+            console.log(
+              "Parâmetros UTM recebidos da página pai:",
+              event.data.utmParams
+            );
             const utmParams = event.data.utmParams;
-            
+
             // Preencher campos ocultos com valores UTM
-            if (utmParams.utm_source) document.getElementById('utm_source').value = utmParams.utm_source;
-            if (utmParams.utm_medium) document.getElementById('utm_medium').value = utmParams.utm_medium;
-            if (utmParams.utm_campaign) document.getElementById('utm_campaign').value = utmParams.utm_campaign;
-            if (utmParams.utm_term) document.getElementById('utm_term').value = utmParams.utm_term;
-            if (utmParams.utm_content) document.getElementById('utm_content').value = utmParams.utm_content;
-            
-            console.log('Campos UTM preenchidos no formulário');
+            if (utmParams.utm_source)
+              document.getElementById("utm_source").value =
+                utmParams.utm_source;
+            if (utmParams.utm_medium)
+              document.getElementById("utm_medium").value =
+                utmParams.utm_medium;
+            if (utmParams.utm_campaign)
+              document.getElementById("utm_campaign").value =
+                utmParams.utm_campaign;
+            if (utmParams.utm_term)
+              document.getElementById("utm_term").value = utmParams.utm_term;
+            if (utmParams.utm_content)
+              document.getElementById("utm_content").value =
+                utmParams.utm_content;
+
+            console.log("Campos UTM preenchidos no formulário");
           }
         });
-        
+
         // Enviar mensagem para a página pai informando que o iframe está pronto
-        console.log("Iframe carregado, enviando mensagem de pronto para a página pai");
-        window.parent.postMessage({
-          type: 'IFRAME_READY'
-        }, '*'); // Usar '*' para permitir qualquer origem durante o desenvolvimento
-        
+        console.log(
+          "Iframe carregado, enviando mensagem de pronto para a página pai"
+        );
+        window.parent.postMessage(
+          {
+            type: "IFRAME_READY",
+          },
+          "*"
+        ); // Usar '*' para permitir qualquer origem durante o desenvolvimento
+
         // Função alternativa para capturar UTMs diretamente da URL do iframe
         // (como fallback, caso a comunicação postMessage falhe)
         function getUtmParamsFromUrl() {
           const urlParams = new URLSearchParams(window.location.search);
           const utmFields = [
-            { param: 'utm_source', field: 'utm_source' },
-            { param: 'utm_medium', field: 'utm_medium' },
-            { param: 'utm_campaign', field: 'utm_campaign' },
-            { param: 'utm_term', field: 'utm_term' },
-            { param: 'utm_content', field: 'utm_content' }
+            { param: "utm_source", field: "utm_source" },
+            { param: "utm_medium", field: "utm_medium" },
+            { param: "utm_campaign", field: "utm_campaign" },
+            { param: "utm_term", field: "utm_term" },
+            { param: "utm_content", field: "utm_content" },
           ];
-          
-          utmFields.forEach(item => {
+
+          utmFields.forEach((item) => {
             if (urlParams.has(item.param)) {
-              document.getElementById(item.field).value = urlParams.get(item.param);
+              document.getElementById(item.field).value = urlParams.get(
+                item.param
+              );
             }
           });
         }
-        
+
         // Tentar capturar UTMs diretamente da URL como fallback
         getUtmParamsFromUrl();
 
@@ -642,7 +666,6 @@
         }
       });
     </script>
+
   </body>
 </html>
-
-
