@@ -147,7 +147,10 @@ function updateMockupUrlAsync(email, mockupUrl) {
             // Try a more direct approach on the next attempt
             if (attemptIndex + 1 < retryIntervals.length) {
               console.log(`Will try a more direct approach on next attempt`);
-              attemptUpdate(attemptIndex + 1);
+              // Adicionar delay de 1 segundo antes da próxima tentativa
+              setTimeout(() => {
+                attemptUpdate(attemptIndex + 1);
+              }, 1000);
             }
           }
         } catch (acError) {
@@ -158,9 +161,11 @@ function updateMockupUrlAsync(email, mockupUrl) {
             acError
           );
 
-          // Schedule next attempt
+          // Schedule next attempt with 1 second delay
           if (attemptIndex + 1 < retryIntervals.length) {
-            attemptUpdate(attemptIndex + 1);
+            setTimeout(() => {
+              attemptUpdate(attemptIndex + 1);
+            }, 1000);
           }
         }
       } catch (error) {
@@ -169,9 +174,11 @@ function updateMockupUrlAsync(email, mockupUrl) {
           error
         );
 
-        // Schedule next attempt
+        // Schedule next attempt with 1 second delay
         if (attemptIndex + 1 < retryIntervals.length) {
-          attemptUpdate(attemptIndex + 1);
+          setTimeout(() => {
+            attemptUpdate(attemptIndex + 1);
+          }, 1000);
         }
       }
     }, delay);
@@ -327,3 +334,4 @@ module.exports = {
   processLeadWithMockupAsync,
   updateMockupUrlWithRetry,
 };
+
