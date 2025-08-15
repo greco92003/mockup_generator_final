@@ -438,25 +438,10 @@
               "Parâmetros UTM recebidos da página pai:",
               event.data.utmParams
             );
-            const utmParams = event.data.utmParams;
 
-            // Preencher campos ocultos com valores UTM
-            if (utmParams.utm_source)
-              document.getElementById("utm_source").value =
-                utmParams.utm_source;
-            if (utmParams.utm_medium)
-              document.getElementById("utm_medium").value =
-                utmParams.utm_medium;
-            if (utmParams.utm_campaign)
-              document.getElementById("utm_campaign").value =
-                utmParams.utm_campaign;
-            if (utmParams.utm_term)
-              document.getElementById("utm_term").value = utmParams.utm_term;
-            if (utmParams.utm_content)
-              document.getElementById("utm_content").value =
-                utmParams.utm_content;
-
-            console.log("Campos UTM preenchidos no formulário");
+            // Usar a nova função para preencher UTMs via postMessage
+            fillUtmFromPostMessage(event.data.utmParams);
+            console.log("Campos UTM preenchidos via postMessage");
           }
         });
 
@@ -471,10 +456,27 @@
           "*"
         ); // Usar '*' para permitir qualquer origem durante o desenvolvimento
 
-        // Função alternativa para capturar UTMs diretamente da URL do iframe
-        // (como fallback, caso a comunicação postMessage falhe)
-        function getUtmParamsFromUrl() {
-          const urlParams = new URLSearchParams(window.location.search);
+        // Função para ler cookies
+        function getCookie(name) {
+          const match = document.cookie.match(
+            new RegExp("(^| )" + name + "=([^;]+)")
+          );
+          if (match) return decodeURIComponent(match[2]);
+          return null;
+        }
+
+        // Função para ler localStorage
+        function getFromLocalStorage(name) {
+          try {
+            return localStorage.getItem(name);
+          } catch (e) {
+            console.log("Erro ao acessar localStorage:", e);
+            return null;
+          }
+        }
+
+        // Função unificada para capturar UTMs de múltiplas fontes
+        function getUtmParamsFromAllSources() {
           const utmFields = [
             { param: "utm_source", field: "utm_source" },
             { param: "utm_medium", field: "utm_medium" },
@@ -484,16 +486,97 @@
           ];
 
           utmFields.forEach((item) => {
-            if (urlParams.has(item.param)) {
-              document.getElementById(item.field).value = urlParams.get(
-                item.param
-              );
+            const fieldElement = document.getElementById(item.field);
+
+            // Só preencher se o campo ainda estiver vazio
+            if (fieldElement && !fieldElement.value) {
+              let value = null;
+
+              // Prioridade 1: Cookies (dados persistentes do GTM)
+              value = getCookie(item.param);
+
+              // Prioridade 2: localStorage (backup dos cookies)
+              if (!value) {
+                value = getFromLocalStorage(item.param);
+              }
+
+              // Prioridade 3: URL parameters (fallback final)
+              if (!value) {
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.has(item.param)) {
+                  value = urlParams.get(item.param);
+                }
+              }
+
+              // Preencher o campo se encontrou algum valor
+              if (value) {
+                fieldElement.value = value;
+                console.log(`UTM ${item.param} preenchido com:`, value);
+              }
             }
           });
         }
 
-        // Tentar capturar UTMs diretamente da URL como fallback
-        getUtmParamsFromUrl();
+        // Função para preencher UTMs recebidos via postMessage
+        function fillUtmFromPostMessage(utmParams) {
+          const utmFields = [
+            { param: "utm_source", field: "utm_source" },
+            { param: "utm_medium", field: "utm_medium" },
+            { param: "utm_campaign", field: "utm_campaign" },
+            { param: "utm_term", field: "utm_term" },
+            { param: "utm_content", field: "utm_content" },
+          ];
+
+          utmFields.forEach((item) => {
+            if (utmParams[item.param]) {
+              const fieldElement = document.getElementById(item.field);
+              if (fieldElement) {
+                fieldElement.value = utmParams[item.param];
+                console.log(
+                  `UTM ${item.param} preenchido via postMessage:`,
+                  utmParams[item.param]
+                );
+              }
+            }
+          });
+        }
+
+        // Tentar capturar UTMs de todas as fontes disponíveis
+        getUtmParamsFromAllSources();
+
+        // Tentar novamente após um pequeno delay para garantir que cookies/localStorage estejam disponíveis
+        setTimeout(() => {
+          getUtmParamsFromAllSources();
+        }, 1000);
+
+        // Verificar periodicamente se ainda há campos vazios (útil para SPAs)
+        let retryCount = 0;
+        const maxRetries = 5;
+        const retryInterval = setInterval(() => {
+          retryCount++;
+
+          // Verificar se ainda há campos UTM vazios
+          const hasEmptyUtmFields = [
+            "utm_source",
+            "utm_medium",
+            "utm_campaign",
+            "utm_term",
+            "utm_content",
+          ].some((fieldId) => {
+            const field = document.getElementById(fieldId);
+            return field && !field.value;
+          });
+
+          if (hasEmptyUtmFields && retryCount < maxRetries) {
+            console.log(`Tentativa ${retryCount} de capturar UTMs...`);
+            getUtmParamsFromAllSources();
+          } else {
+            clearInterval(retryInterval);
+            if (retryCount >= maxRetries) {
+              console.log("Máximo de tentativas de captura UTM atingido");
+            }
+          }
+        }, 2000);
 
         // Update file name when file is selected
         fileInput.addEventListener("change", function () {
@@ -505,7 +588,8 @@
 
             // Verificar o tamanho do arquivo (2MB = 2 * 1024 * 1024 bytes)
             if (file.size > 2 * 1024 * 1024) {
-              logoError.textContent = "Seu arquivo é muito grande. Envie um arquivo menor que 2MB.";
+              logoError.textContent =
+                "Seu arquivo é muito grande. Envie um arquivo menor que 2MB.";
               logoError.style.display = "block";
               return;
             }
@@ -513,7 +597,8 @@
             // Verificar o tipo de arquivo imediatamente
             const validTypes = ["image/png", "image/jpeg", "application/pdf"];
             if (!validTypes.includes(file.type)) {
-              logoError.textContent = "Por favor, selecione um arquivo PNG, JPG ou PDF.";
+              logoError.textContent =
+                "Por favor, selecione um arquivo PNG, JPG ou PDF.";
               logoError.style.display = "block";
             }
           } else {
@@ -555,7 +640,8 @@
           // Validate logo file
           const logoFile = document.getElementById("logo").files[0];
           if (!logoFile) {
-            logoError.textContent = "Por favor, selecione um arquivo antes de enviar.";
+            logoError.textContent =
+              "Por favor, selecione um arquivo antes de enviar.";
             logoError.style.display = "block";
             fileInput.focus();
             return;
@@ -563,7 +649,8 @@
 
           // Verificar o tamanho do arquivo (2MB = 2 * 1024 * 1024 bytes)
           if (logoFile.size > 2 * 1024 * 1024) {
-            logoError.textContent = "Seu arquivo é muito grande. Envie um arquivo menor que 2MB.";
+            logoError.textContent =
+              "Seu arquivo é muito grande. Envie um arquivo menor que 2MB.";
             logoError.style.display = "block";
             return;
           }
@@ -571,7 +658,8 @@
           // Check file type
           const validTypes = ["image/png", "image/jpeg", "application/pdf"];
           if (!validTypes.includes(logoFile.type)) {
-            logoError.textContent = "Por favor, selecione um arquivo PNG, JPG ou PDF.";
+            logoError.textContent =
+              "Por favor, selecione um arquivo PNG, JPG ou PDF.";
             logoError.style.display = "block";
             return;
           }
